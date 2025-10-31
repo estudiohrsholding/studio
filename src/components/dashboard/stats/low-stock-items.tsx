@@ -1,3 +1,4 @@
+
 import {
   Card,
   CardHeader,
@@ -13,23 +14,24 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { mockInventory } from '@/lib/data';
+import type { Item } from '@/lib/types';
 
-const lowStockItems = mockInventory
-  .filter((item) => item.stock < 20)
-  .sort((a, b) => a.stock - b.stock);
+interface LowStockItemsProps {
+    items: Item[];
+}
 
-export function LowStockItems() {
+export function LowStockItems({ items }: LowStockItemsProps) {
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="font-headline">Low Stock Items</CardTitle>
         <CardDescription>
-          Items that are running low and need to be refilled.
+          Items with a stock level below 20 units.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {lowStockItems.length > 0 ? (
+        {items.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -38,7 +40,7 @@ export function LowStockItems() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {lowStockItems.map((item) => (
+              {items.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell>
                     <div className="font-medium">{item.name}</div>
@@ -47,7 +49,7 @@ export function LowStockItems() {
                     </div>
                   </TableCell>
                   <TableCell className="text-right font-medium text-destructive">
-                    {item.stock}
+                    {item.stockLevel}
                   </TableCell>
                 </TableRow>
               ))}

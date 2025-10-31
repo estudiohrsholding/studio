@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
@@ -16,16 +17,6 @@ import {
   ChartConfig,
 } from '@/components/ui/chart';
 
-const chartData = [
-  { day: 'Mon', sales: 150 },
-  { day: 'Tue', sales: 230 },
-  { day: 'Wed', sales: 310 },
-  { day: 'Thu', sales: 220 },
-  { day: 'Fri', sales: 450 },
-  { day: 'Sat', sales: 600 },
-  { day: 'Sun', sales: 350 },
-];
-
 const chartConfig = {
   sales: {
     label: 'Sales (€)',
@@ -33,7 +24,13 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function DailySalesChart() {
+interface DailySalesChartProps {
+  data: { day: string; sales: number }[];
+}
+
+export function DailySalesChart({ data }: DailySalesChartProps) {
+  const hasData = data && data.length > 0 && data.some(d => d.sales > 0);
+
   return (
     <Card>
       <CardHeader>
@@ -41,28 +38,34 @@ export function DailySalesChart() {
         <CardDescription>Sales figures for the last 7 days.</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig}>
-          <BarChart data={chartData} accessibilityLayer>
-            <CartesianGrid vertical={false} />
-            <XAxis
-              dataKey="day"
-              tickLine={false}
-              tickMargin={10}
-              axisLine={false}
-            />
-             <YAxis
+        {hasData ? (
+          <ChartContainer config={chartConfig}>
+            <BarChart data={data} accessibilityLayer>
+              <CartesianGrid vertical={false} />
+              <XAxis
+                dataKey="day"
+                tickLine={false}
+                tickMargin={10}
+                axisLine={false}
+              />
+              <YAxis
                 tickLine={false}
                 axisLine={false}
                 tickMargin={10}
                 tickFormatter={(value) => `€${value}`}
-            />
-            <ChartTooltip
-              cursor={false}
-              content={<ChartTooltipContent indicator="dot" />}
-            />
-            <Bar dataKey="sales" fill="var(--color-sales)" radius={8} />
-          </BarChart>
-        </ChartContainer>
+              />
+              <ChartTooltip
+                cursor={false}
+                content={<ChartTooltipContent indicator="dot" />}
+              />
+              <Bar dataKey="sales" fill="var(--color-sales)" radius={8} />
+            </BarChart>
+          </ChartContainer>
+        ) : (
+            <div className="flex h-[300px] items-center justify-center text-muted-foreground">
+                No sales data available for the last 7 days.
+            </div>
+        )}
       </CardContent>
     </Card>
   );
