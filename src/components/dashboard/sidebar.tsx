@@ -50,7 +50,7 @@ export function DashboardSidebar({ children }: { children: React.ReactNode }) {
           >
             <Logo className="size-8 text-primary" />
             <span className="font-headline text-lg font-semibold group-data-[collapsible=icon]:hidden">
-              CannabiApp
+              <span className="text-primary">Cannab</span><span className="text-accent">iA</span><span className="text-primary">pp</span>
             </span>
           </Link>
         </SidebarHeader>
