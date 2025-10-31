@@ -145,8 +145,8 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
     } catch (error: any) {
       console.error('%c[DEBUG] 14. CRITICAL FAILURE in try block:', 'color: #FF0000', error.code, error.message);
       console.error(error);
-      if (error.code === 'storage/unauthorized' || error.code === 'storage/object-not-found' || error.message.includes('CORS')) {
-        setError("File upload failed. This is likely a cloud configuration issue. Please ensure Firebase Storage is enabled and CORS is configured correctly for your bucket.");
+      if (error.code === 'storage/unauthorized' || error.message.includes('CORS')) {
+        setError("File upload failed due to a permissions issue. This is likely a cloud configuration problem. Please ensure Firebase Storage is enabled and CORS has been configured correctly for your bucket.");
       } else {
         setError(`An unexpected error occurred: ${error.message}`);
       }
