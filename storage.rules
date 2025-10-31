@@ -1,12 +1,25 @@
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow authorized admins to write to their club's member_ids folder
-    match /clubs/{clubId}/member_ids/{fileName} {
-      allow write: if request.auth != null && request.auth.token.clubId == clubId;
+
+    /**
+     * @description Verifies that the user is authenticated and is a member of the specified tenant (club).
+     * This is the canonical way to enforce multi-tenant security in Storage rules.
+     * @param {string} clubId - The ID of the club from the resource path.
+     * @returns {boolean} - True if the user is authenticated and their token's clubId matches.
+     */
+    function isTenantMember(clubId) {
+      return request.auth != null && request.auth.token.clubId == clubId;
     }
 
-    // Public read access for all files is generally acceptable if URLs are unguessable
+    // Rule for the member_ids folder.
+    // Enforces that only an authenticated admin of the specific club can write files here.
+    match /clubs/{clubId}/member_ids/{fileName} {
+      allow write: if isTenantMember(clubId);
+    }
+
+    // Public read access for all files remains, as their URLs are unguessable.
     allow read;
   }
 }
