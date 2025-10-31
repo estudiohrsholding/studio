@@ -1,3 +1,52 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "member-1",
+      "description": "Profile picture of a club member",
+      "imageUrl": "https://images.unsplash.com/photo-1600180758890-6b94519a8ba6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxwZXJzb24lMjBwb3J0cmFpdHxlbnwwfHx8fDE3NjE3ODg3ODd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "member-2",
+      "description": "Profile picture of a club member",
+      "imageUrl": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxwZXJzb24lMjBwb3J0cmFpdHxlbnwwfHx8fDE3NjE3ODg3ODd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "member-3",
+      "description": "Profile picture of a club member",
+      "imageUrl": "https://images.unsplash.com/photo-1592621385612-4d7129426394?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHx3b21hbiUyMHNtaWxpbmd8ZW58MHx8fHwxNzYxNzgzNzUwfDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "woman smiling"
+    },
+    {
+      "id": "member-4",
+      "description": "Profile picture of a club member",
+      "imageUrl": "https://images.unsplash.com/photo-1569779213435-ba3167dde7cc?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxtYW4lMjBnbGFzc2VzfGVufDB8fHx8MTc2MTgxNjk5M3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "man glasses"
+    },
+    {
+      "id": "member-5",
+      "description": "Profile picture of a club member",
+      "imageUrl": "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxwZXJzb24lMjBwcm9maWxlfGVufDB8fHx8MTc2MTgyMDcwM3ww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person profile"
+    },
+    {
+      "id": "item-1",
+      "description": "Image of a product",
+      "imageUrl": "https://images.unsplash.com/photo-1721744179425-de2264b1a880?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxMHx8cHJvZHVjdCUyMHBhY2thZ2V8ZW58MHx8fHwxNzYxNzgwODc0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "product package"
+    },
+    {
+      "id": "item-2",
+      "description": "Image of a product",
+      "imageUrl": "https://images.unsplash.com/photo-1643769535215-3ced8c3fc3a7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxib3R0bGUlMjBsYWJlbHxlbnwwfHx8fDE3NjE4NzQ3ODd8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "bottle label"
+    },
+    {
+      "id": "item-3",
+      "description": "Image of a product",
+      "imageUrl": "https://images.unsplash.com/photo-1620663858647-89b695e62d45?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxmb29kJTIwc25hY2t8ZW58MHx8fHwxNzYxODc0Nzg3fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "food snack"
+    }
+  ]
 }
