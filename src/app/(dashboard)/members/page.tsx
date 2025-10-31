@@ -2,7 +2,7 @@
 'use client';
 
 import Image from 'next/image';
-import { PlusCircle, Camera, Paperclip } from 'lucide-react';
+import { PlusCircle, Camera, Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -82,19 +82,29 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
   const handleOpenCamera = async () => {
     setIsCameraActive(true);
     setError(null);
+    let stream: MediaStream | null = null;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: 'environment' } },
+      // First, try to get the environment-facing (rear) camera
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
       });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
     } catch (err) {
-      console.error('Camera access denied:', err);
-      setError(
-        'Could not access the rear camera. Please check your browser permissions.'
-      );
-      setIsCameraActive(false);
+      console.warn('Rear camera not found or failed, falling back. Error:', err);
+      try {
+        // If the rear camera fails, fall back to any available camera
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      } catch (finalErr) {
+        console.error('Camera access denied:', finalErr);
+        setError(
+          'Could not access any camera. Please check your browser permissions.'
+        );
+        setIsCameraActive(false);
+        return;
+      }
+    }
+  
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
     }
   };
 
@@ -191,10 +201,12 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
     } catch (error: any) {
       console.error('%c[DEBUG] 14. CRITICAL FAILURE in try block:', 'color: #FF0000', error.code, error.message);
       console.error(error);
-      if (error.code === 'storage/unauthorized' || error.code === 'storage/object-not-found') {
-        setError("File upload failed due to a permissions issue. This is likely due to a misconfiguration in your Firebase Storage security rules or the bucket not being properly configured. Please check your Firebase console.");
+      if (error.code === 'storage/unauthorized') {
+        setError("Upload failed due to a permissions issue. This is often caused by an issue with security rules or the user's authentication token. Please ensure your storage rules are correct and you are properly authenticated.");
+      } else if (error.code === 'storage/object-not-found') {
+        setError("Upload failed because the storage bucket could not be found. Please ensure that Firebase Storage is enabled for your project in the Firebase Console and the bucket name in your config is correct.");
       } else if (error.message.includes('CORS')) {
-        setError("File upload failed due to a CORS policy error. Please ensure your storage bucket has been correctly configured to allow requests from this domain.");
+        setError("Upload failed due to a CORS policy error. Please ensure your storage bucket has been correctly configured to allow requests from this domain by setting a `cors.json` file.");
       } else {
         setError(`An unexpected error occurred: ${error.message}`);
       }
@@ -244,7 +256,7 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
                    setIsCameraActive(false);
                 }}>Cancel</Button>
               <Button onClick={handleCapturePhoto}>
-                <Camera className="mr-2" />
+                <Camera className="mr-2 h-4 w-4" />
                 Capture Photo
               </Button>
             </DialogFooter>
@@ -516,5 +528,3 @@ export default function MembersPage() {
     </>
   );
 }
-
-    
