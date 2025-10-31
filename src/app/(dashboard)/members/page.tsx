@@ -2,7 +2,7 @@
 'use client';
 
 import Image from 'next/image';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Camera, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -34,7 +34,7 @@ import { DashboardHeader } from '@/components/dashboard/header';
 import { PageWrapper } from '@/components/dashboard/page-wrapper';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import {
   getFirestore,
   collection,
@@ -74,24 +74,73 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
   const [idPhoto, setIdPhoto] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleOpenCamera = async () => {
+    setIsCameraActive(true);
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: 'environment' } },
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error('Camera access denied:', err);
+      setError(
+        'Could not access the rear camera. Please check your browser permissions.'
+      );
+      setIsCameraActive(false);
+    }
+  };
+
+  const handleCapturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+    context?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const capturedFile = new File([blob], `capture-${Date.now()}.jpg`, {
+          type: 'image/jpeg',
+        });
+        setIdPhoto(capturedFile);
+      }
+    }, 'image/jpeg');
+
+    stopCameraStream();
+    setIsCameraActive(false);
+  };
+
+  const stopCameraStream = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
+  };
+
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     console.log('%c[DEBUG] 1. handleSubmit: Triggered.', 'color: #00FF00');
   
-    // Get all states
     const clubId = useAuthStore.getState().clubId;
-    const data = {
-      fullName, // from form state
-      email, // from form state
-      idPhoto, // from file state
-    };
+    const data = { fullName, email, idPhoto };
   
     console.log('[DEBUG] 2. Validating input...', { clubId, ...data });
-    setIsLoading(true); // Button now says "Saving..."
+    setIsLoading(true); 
     setError(null);
   
-    // --- Guard Clauses ---
     if (!clubId) {
       console.error('%c[DEBUG] 3. FAILURE: clubId is null.', 'color: #FF0000');
       setError('Could not identify the club. Please log in again.');
@@ -100,13 +149,12 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
     }
     if (!data.fullName || !data.email || !data.idPhoto) {
       console.error('%c[DEBUG] 3. FAILURE: Form is incomplete.', 'color: #FF0000');
-      setError('Please fill out all fields and select an ID photo.');
+      setError('Please fill out all fields and select or capture an ID photo.');
       setIsLoading(false);
       return;
     }
   
     try {
-      // --- STEP 1: UPLOAD FILE ---
       console.log('[DEBUG] 4. Creating Storage reference...');
       const storage = getStorage();
       const uniqueFileName = `${uuidv4()}-${data.idPhoto.name}`;
@@ -117,19 +165,17 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
       await uploadBytes(storageRef, data.idPhoto);
       console.log('%c[DEBUG] 7. SUCCESS: File Uploaded.', 'color: #00FF00');
   
-      // --- STEP 2: GET URL ---
       console.log('[DEBUG] 8. Awaiting getDownloadURL()...');
       const downloadURL = await getDownloadURL(storageRef);
       console.log('%c[DEBUG] 9. SUCCESS: Got URL:', 'color: #00FF00', downloadURL);
   
-      // --- STEP 3: WRITE DOCUMENT ---
       const newMemberData = {
         name: data.fullName,
         email: data.email,
         idPhotoUrl: downloadURL,
         clubId: clubId,
         createdAt: serverTimestamp(),
-        avatar: `https://picsum.photos/seed/${uuidv4()}/200/200`, // Match existing schema
+        avatar: `https://picsum.photos/seed/${uuidv4()}/200/200`,
       };
       console.log('[DEBUG] 10. Built Firestore object:', newMemberData);
   
@@ -140,19 +186,21 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
       console.log('%c[DEBUG] 12. SUCCESS: Doc written to Firestore.', 'color: #00FF00');
   
       console.log('[DEBUG] 13. Calling onMemberAdded()...');
-      onMemberAdded(); // Close the modal
+      onMemberAdded(); 
   
     } catch (error: any) {
       console.error('%c[DEBUG] 14. CRITICAL FAILURE in try block:', 'color: #FF0000', error.code, error.message);
       console.error(error);
-      if (error.code === 'storage/unauthorized' || error.code === 'storage/object-not-found' || error.message.includes('CORS')) {
-        setError("File upload failed. This is likely due to a permissions issue with Firebase Storage. Please ensure your storage bucket exists and that the CORS policy has been correctly configured for your environment.");
+      if (error.code === 'storage/unauthorized' || error.code === 'storage/object-not-found') {
+        setError("File upload failed due to a permissions issue. This is likely due to a misconfiguration in your Firebase Storage security rules or the bucket not being properly configured. Please check your Firebase console.");
+      } else if (error.message.includes('CORS')) {
+        setError("File upload failed due to a CORS policy error. Please ensure your storage bucket has been correctly configured to allow requests from this domain.");
       } else {
         setError(`An unexpected error occurred: ${error.message}`);
       }
     } finally {
       console.log('[DEBUG] 15. Finally block executed.');
-      setIsLoading(false); // This MUST run to reset the button
+      setIsLoading(false);
     }
   };
 
@@ -166,6 +214,8 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
           setIdPhoto(null);
           setError(null);
           setIsLoading(false);
+          setIsCameraActive(false);
+          stopCameraStream();
         }
       }}
     >
@@ -176,68 +226,115 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
         </Button>
       </DialogTrigger>
       <DialogContent>
-        <form onSubmit={handleSubmit}>
-          <DialogHeader>
-            <DialogTitle className="font-headline">Add New Member</DialogTitle>
-            <DialogDescription>
-              Fill in the form to register a new member. A unique ID will be
-              generated.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Full Name
-              </Label>
-              <Input
-                id="name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="col-span-3"
-                required
-              />
+        {isCameraActive ? (
+          <div>
+            <DialogHeader>
+              <DialogTitle className="font-headline">Capture ID Photo</DialogTitle>
+              <DialogDescription>
+                Position the ID in the frame and capture the photo.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="relative my-4">
+              <video ref={videoRef} className="w-full rounded-md" autoPlay playsInline />
+              <canvas ref={canvasRef} className="hidden" />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="email" className="text-right">
-                Email
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="col-span-3"
-                required
-              />
-            </div>
-             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="idPhoto" className="text-right">
-                ID Photo
-              </Label>
-              <Input
-                id="idPhoto"
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  if (e.target.files) setIdPhoto(e.target.files[0]);
-                }}
-                className="col-span-3"
-                required
-              />
-            </div>
-             {error && (
-              <Alert variant="destructive">
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+            <DialogFooter className="sm:justify-between">
+               <Button variant="outline" onClick={() => {
+                   stopCameraStream();
+                   setIsCameraActive(false);
+                }}>Cancel</Button>
+              <Button onClick={handleCapturePhoto}>
+                <Camera className="mr-2" />
+                Capture Photo
+              </Button>
+            </DialogFooter>
           </div>
-          <DialogFooter>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Saving...' : 'Save Member'}
-            </Button>
-          </DialogFooter>
-        </form>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <DialogHeader>
+              <DialogTitle className="font-headline">Add New Member</DialogTitle>
+              <DialogDescription>
+                Fill in the form to register a new member. A unique ID will be
+                generated.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Full Name
+                </Label>
+                <Input
+                  id="name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="col-span-3"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="email" className="text-right">
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="col-span-3"
+                  required
+                />
+              </div>
+               <div className="grid grid-cols-4 items-center gap-4">
+                <Label className="text-right">
+                  ID Photo
+                </Label>
+                <div className="col-span-3 grid grid-cols-2 gap-2">
+                    <Button type="button" variant="outline" onClick={handleOpenCamera}>
+                        <Camera className="mr-2 h-4 w-4" /> Take Photo
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                        <Paperclip className="mr-2 h-4 w-4" /> Attach File
+                    </Button>
+                    <Input
+                        ref={fileInputRef}
+                        id="idPhoto"
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                        if (e.target.files) setIdPhoto(e.target.files[0]);
+                        }}
+                        className="hidden"
+                    />
+                </div>
+              </div>
+
+               {idPhoto && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <div/>
+                  <div className="col-span-3 flex items-center gap-2 text-sm text-muted-foreground">
+                    <Image src={URL.createObjectURL(idPhoto)} alt="ID preview" width={40} height={40} className="rounded-md object-cover" />
+                    <span className="truncate">{idPhoto.name}</span>
+                    <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIdPhoto(null)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+               {error && (
+                <Alert variant="destructive">
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'Saving...' : 'Save Member'}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -390,7 +487,6 @@ function MembersList() {
 }
 
 export default function MembersPage() {
-  // A simple state to force-close the dialog from the child component
   const [dialogKey, setDialogKey] = useState(0);
 
   return (
@@ -420,3 +516,5 @@ export default function MembersPage() {
     </>
   );
 }
+
+    
