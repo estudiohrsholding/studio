@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -33,6 +34,14 @@
     --color-vapes: hsl(43, 90%, 60%);    /* Bright Yellow */
     --color-topicals: hsl(260, 65%, 70%);/* Soft Purple */
     --color-other: hsl(210, 15%, 70%);   /* Neutral Gray */
+
+    /* Category Colors */
+    --color-cat-1: hsl(200, 80%, 60%);
+    --color-cat-2: hsl(340, 80%, 60%);
+    --color-cat-3: hsl(60, 80%, 60%);
+    --color-cat-4: hsl(280, 80%, 60%);
+    --color-cat-5: hsl(150, 80%, 60%);
+    --color-cat-6: hsl(20, 80%, 60%);
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -73,6 +82,14 @@
     --color-vapes: hsl(43, 95%, 65%);    /* Bright Yellow */
     --color-topicals: hsl(260, 75%, 75%);/* Soft Purple */
     --color-other: hsl(210, 10%, 75%);   /* Neutral Gray */
+
+    /* Category Colors */
+    --color-cat-1: hsl(200, 85%, 65%);
+    --color-cat-2: hsl(340, 85%, 65%);
+    --color-cat-3: hsl(60, 85%, 65%);
+    --color-cat-4: hsl(280, 85%, 65%);
+    --color-cat-5: hsl(150, 85%, 65%);
+    --color-cat-6: hsl(20, 85%, 65%);
 
     --sidebar-background: 210 4% 16%;
     --sidebar-foreground: 0 0% 98%;

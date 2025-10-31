@@ -27,7 +27,7 @@ interface ChartDataItem {
     fill: string;
 }
 
-interface StockLevelsChartProps {
+interface CategoryDistributionChartProps {
     data: ChartDataItem[];
 }
 
@@ -37,7 +37,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function StockLevelsChart({ data = [] }: StockLevelsChartProps) {
+export function CategoryDistributionChart({ data = [] }: CategoryDistributionChartProps) {
   const totalStock = React.useMemo(() => {
     return data.reduce((acc, item) => acc + item.value, 0);
   }, [data]);
@@ -57,8 +57,8 @@ export function StockLevelsChart({ data = [] }: StockLevelsChartProps) {
   return (
     <Card className="flex flex-col">
       <CardHeader className="items-center pb-0">
-        <CardTitle className="font-headline">Stock by Group</CardTitle>
-        <CardDescription>Total stock quantity per group</CardDescription>
+        <CardTitle className="font-headline">Stock by Category</CardTitle>
+        <CardDescription>Total stock quantity per category</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
         {data.length > 0 ? (
@@ -95,7 +95,7 @@ export function StockLevelsChart({ data = [] }: StockLevelsChartProps) {
           Total Stock: {totalStock} units
         </div>
         <div className="leading-none text-muted-foreground">
-          Showing total stock across all groups.
+          Showing total stock across all categories.
         </div>
       </CardFooter>
     </Card>

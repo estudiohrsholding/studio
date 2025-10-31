@@ -17,6 +17,7 @@ import { PageWrapper } from '@/components/dashboard/page-wrapper';
 import { DailySalesChart } from '@/components/dashboard/stats/daily-sales-chart';
 import { LowStockItems } from '@/components/dashboard/stats/low-stock-items';
 import { StockLevelsChart } from '@/components/dashboard/stats/stock-levels-chart';
+import { CategoryDistributionChart } from '@/components/dashboard/stats/category-distribution-chart';
 import type { Item } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -32,17 +33,28 @@ interface DailySale {
   sales: number;
 }
 
-interface HierarchicalStockData {
+interface ChartDataItem {
     name: string;
-    children: {
-        name: string;
-        value: number;
-    }[];
+    value: number;
+    fill: string;
 }
 
-const chartColors = [
-    'hsl(var(--color-flowers))', 'hsl(var(--color-oils))', 'hsl(var(--color-edibles))', 
-    'hsl(var(--color-vapes))', 'hsl(var(--color-topicals))', 'hsl(var(--color-other))'
+const groupColors: Record<string, string> = {
+    'Flowers': 'hsl(var(--color-flowers))',
+    'Oils': 'hsl(var(--color-oils))',
+    'Edibles': 'hsl(var(--color-edibles))',
+    'Vapes': 'hsl(var(--color-vapes))',
+    'Topicals': 'hsl(var(--color-topicals))',
+    'Default': 'hsl(var(--color-other))',
+};
+
+const categoryColors: string[] = [
+    'hsl(var(--color-cat-1))',
+    'hsl(var(--color-cat-2))',
+    'hsl(var(--color-cat-3))',
+    'hsl(var(--color-cat-4))',
+    'hsl(var(--color-cat-5))',
+    'hsl(var(--color-cat-6))',
 ];
 
 export default function StatsPage() {
@@ -50,7 +62,8 @@ export default function StatsPage() {
   
   const [dailySalesData, setDailySalesData] = useState<DailySale[]>([]);
   const [lowStockItems, setLowStockItems] = useState<Item[]>([]);
-  const [hierarchicalStockData, setHierarchicalStockData] = useState<HierarchicalStockData[]>([]);
+  const [groupDistributionData, setGroupDistributionData] = useState<ChartDataItem[]>([]);
+  const [categoryDistributionData, setCategoryDistributionData] = useState<ChartDataItem[]>([]);
   
   const [isSalesLoading, setIsSalesLoading] = useState(true);
   const [isStockLoading, setIsStockLoading] = useState(true);
@@ -123,36 +136,33 @@ export default function StatsPage() {
     const unsubscribe = onSnapshot(inventoryQuery, (snapshot) => {
         const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Item));
         
-        // --- Hierarchical Data Processing ---
-        const stockByGroupAndCategory: Record<string, Record<string, number>> = {};
+        // --- Group & Category Data Processing ---
+        const stockByGroup: Record<string, number> = {};
+        const stockByCategory: Record<string, number> = {};
         
         items.forEach(item => {
             const group = item.group || 'Uncategorized';
             const category = item.category || 'Uncategorized';
+            const stock = item.stockLevel || 0;
             
-            if (!stockByGroupAndCategory[group]) {
-                stockByGroupAndCategory[group] = {};
-            }
-            if (!stockByGroupAndCategory[group][category]) {
-                stockByGroupAndCategory[group][category] = 0;
-            }
-            stockByGroupAndCategory[group][category] += item.stockLevel;
+            stockByGroup[group] = (stockByGroup[group] || 0) + stock;
+            stockByCategory[category] = (stockByCategory[category] || 0) + stock;
         });
 
-        const hierarchicalData: HierarchicalStockData[] = Object.entries(stockByGroupAndCategory).map(([groupName, categories], groupIndex) => {
-            const children = Object.entries(categories).map(([categoryName, stock]) => ({
-                name: categoryName,
-                value: stock,
-            }));
-            
-            return {
-                name: groupName,
-                children: children,
-                fill: chartColors[groupIndex % chartColors.length]
-            };
-        });
+        const groupData: ChartDataItem[] = Object.entries(stockByGroup).map(([name, value]) => ({
+            name,
+            value,
+            fill: groupColors[name] || groupColors['Default'],
+        }));
 
-        setHierarchicalStockData(hierarchicalData);
+        const categoryData: ChartDataItem[] = Object.entries(stockByCategory).map(([name, value], index) => ({
+            name,
+            value,
+            fill: categoryColors[index % categoryColors.length],
+        }));
+
+        setGroupDistributionData(groupData);
+        setCategoryDistributionData(categoryData);
         setLowStockItems(items.filter(item => item.stockLevel < 20));
         setIsStockLoading(false);
     }, (error) => {
@@ -170,20 +180,24 @@ export default function StatsPage() {
       <DashboardHeader title="Statistics" />
       <PageWrapper>
         {isLoading ? (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <div className="lg:col-span-2"><Skeleton className="h-[400px] w-full" /></div>
                 <div className="lg:col-span-1"><Skeleton className="h-[400px] w-full" /></div>
-                <div className="lg:col-span-3"><Skeleton className="h-[300px] w-full" /></div>
+                <div className="lg:col-span-1"><Skeleton className="h-[400px] w-full" /></div>
+                <div className="lg:col-span-2"><Skeleton className="h-[300px] w-full" /></div>
             </div>
         ) : (
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <div className="lg:col-span-2">
                     <DailySalesChart data={dailySalesData} />
                 </div>
                 <div className="lg:col-span-1">
-                    <StockLevelsChart data={hierarchicalStockData} />
+                    <StockLevelsChart data={groupDistributionData} />
                 </div>
-                <div className="lg:col-span-3">
+                <div className="lg:col-span-1">
+                    <CategoryDistributionChart data={categoryDistributionData} />
+                </div>
+                <div className="lg:col-span-2">
                     <LowStockItems items={lowStockItems} />
                 </div>
             </div>
