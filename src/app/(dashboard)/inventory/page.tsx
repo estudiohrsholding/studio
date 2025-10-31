@@ -391,7 +391,6 @@ function InventoryList() {
                             <span className={item.stockLevel < 15 ? 'text-destructive font-medium' : ''}>
                                 {item.stockLevel}
                             </span>
-                            <span className="text-muted-foreground"> {item.minimumUnitOfSale}</span>
                         </TableCell>
                         <TableCell className="text-right">
                             <RefillDialog item={item} />
@@ -429,5 +428,3 @@ export default function InventoryPage() {
     </>
   );
 }
-
-    
