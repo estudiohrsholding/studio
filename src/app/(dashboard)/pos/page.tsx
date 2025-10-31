@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { PageWrapper } from '@/components/dashboard/page-wrapper';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import type { Item } from '@/lib/types';
 import {
   Dialog,
@@ -33,6 +33,10 @@ import {
   orderBy,
   limit,
   where,
+  writeBatch,
+  doc,
+  serverTimestamp,
+  increment,
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -49,7 +53,9 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { ChevronsUpDown } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useToast } from '@/hooks/use-toast';
+import { mockUser } from '@/lib/data';
 
 interface CartItem extends Item {
   quantity: number;
@@ -72,6 +78,8 @@ export default function POSPage() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const clubId = useAuthStore((state) => state.clubId);
+  const { toast } = useToast();
+
 
   // --- Member Search State & Logic ---
   const [memberSearchTerm, setMemberSearchTerm] = useState('');
@@ -148,14 +156,14 @@ export default function POSPage() {
   const isIntegerOnly = selectedItem ? Number.isInteger(selectedItem.minimumUnitOfSale) : false;
 
   const handleQuantityChange = (newQuantity: string) => {
+    setFormError(null); // Clear error on change
     if (isIntegerOnly && newQuantity.includes('.') && newQuantity.split('.')[1] !== '') {
       setFormError('This item only accepts whole units.');
-      // We still update the quantity to show the invalid input, but the error will be visible
+      // Still update the quantity to show the invalid input, but the error will be visible
       setQuantity(newQuantity);
       return; 
     }
     
-    setFormError(null);
     setQuantity(newQuantity);
 
     if (!selectedItem || !selectedItem.amountPerUnit) {
@@ -204,13 +212,27 @@ export default function POSPage() {
     if (formError) return;
     const numericQuantity = parseFloat(quantity);
     if (!selectedItem || isNaN(numericQuantity) || numericQuantity <= 0) return;
+
+    // --- Task 1: Stock Validation Logic ---
+    const itemInStock = selectedItem.stockLevel;
+    if (numericQuantity > itemInStock) {
+        setFormError(`Not enough stock. Only ${itemInStock} available.`);
+        return; // Stop the item from being added
+    }
+    // --- End Task 1 ---
   
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === selectedItem.id);
       if (existingItem) {
+        // Additional check for adding to existing cart item
+        const newTotalQuantity = existingItem.quantity + numericQuantity;
+        if (newTotalQuantity > itemInStock) {
+            setFormError(`Not enough stock. You have ${existingItem.quantity} in cart, only ${itemInStock - existingItem.quantity} more available.`);
+            return prevCart;
+        }
         return prevCart.map((item) =>
           item.id === selectedItem.id
-            ? { ...item, quantity: item.quantity + numericQuantity }
+            ? { ...item, quantity: newTotalQuantity }
             : item
         );
       }
@@ -234,6 +256,87 @@ export default function POSPage() {
       0
     );
   }, [cart]);
+
+
+  const handleCompleteSale = async () => {
+    if (!clubId || cart.length === 0 || !selectedMember) return;
+    setIsConfirming(true);
+
+    const db = getFirestore();
+    const batch = writeBatch(db);
+
+    try {
+        // --- Operation 1: Create the Transaction Document ---
+        const transactionDocRef = doc(collection(db, 'clubs', clubId, 'transactions'));
+        const transactionData = {
+            memberId: selectedMember.id,
+            memberName: selectedMember.name,
+            cart: cart.map(item => ({ 
+                itemId: item.id, 
+                name: item.name, 
+                quantity: item.quantity, 
+                amount: (item.amountPerUnit || 0) * item.quantity 
+            })),
+            totalAmount: total,
+            dispensedBy: mockUser.name, // Replace with actual user in a real app
+            transactionDate: serverTimestamp(),
+            type: 'dispense',
+            clubId: clubId
+        };
+        batch.set(transactionDocRef, transactionData);
+        
+        // --- Operations 2 & 3: Loop through cart ---
+        for (const item of cart) {
+            // Operation 2: Decrement Inventory
+            const itemDocRef = doc(db, 'clubs', clubId, 'inventoryItems', item.id);
+            batch.update(itemDocRef, { stockLevel: increment(-item.quantity) });
+
+            // Operation 3: Create Audit Log (using transactions collection for simplicity)
+            const logDocRef = doc(collection(db, 'clubs', clubId, 'transactions'));
+            const logData = { 
+                type: 'dispense-log', 
+                transactionDate: serverTimestamp(), 
+                itemId: item.id, 
+                itemName: item.name, 
+                quantity: item.quantity,
+                amount: (item.amountPerUnit || 0) * item.quantity,
+                memberId: selectedMember.id,
+                memberName: selectedMember.name,
+                user: mockUser.name, // Replace with actual user
+                clubId: clubId
+            };
+            batch.set(logDocRef, logData);
+        }
+
+        console.log('%c[DEBUG SALE] Committing batch...', 'color: #00FF00');
+        await batch.commit();
+        console.log('%c[DEBUG SALE] Batch commit SUCCESS!', 'color: #00FF00');
+        
+        // --- Success ---
+        setShowConfirmation(true); // Show confirmation dialog on success
+
+    } catch (error: any) {
+        console.error('%c[DEBUG SALE] CRITICAL FAILURE: Batch failed!', 'color: #FF0000', error);
+        toast({
+            variant: "destructive",
+            title: "Sale Failed",
+            description: "Could not complete the sale. Inventory has not been changed. Error: " + error.message,
+        });
+    } finally {
+        setIsConfirming(false);
+    }
+  };
+
+  const resetPOS = () => {
+    setCart([]);
+    setSelectedMember(null);
+    setSelectedItem(null);
+    setQuantity('1');
+    setAmount('');
+    setFormError(null);
+    setIsConfirming(false);
+    setShowConfirmation(false);
+  }
 
   return (
     <>
@@ -465,54 +568,63 @@ export default function POSPage() {
                   <span>Total</span>
                   <span>€{total.toFixed(2)}</span>
                 </div>
-                <Dialog
-                  open={showConfirmation}
-                  onOpenChange={setShowConfirmation}
-                >
-                  <DialogTrigger asChild>
+                
                     <Button
                       className="mt-4 w-full"
+                      onClick={handleCompleteSale}
                       disabled={
                         cart.length === 0 || !selectedMember || isConfirming
                       }
                     >
                       {isConfirming ? 'Processing...' : 'Confirm Dispense'}
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle className="font-headline text-accent">
-                        Dispense Confirmed
-                      </DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <p>
-                        The following items have been dispensed to{' '}
-                        <span className="font-bold">{selectedMember?.name}</span>:
-                      </p>
-                      <div className="space-y-2 rounded-md border p-4">
-                        {cart.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex justify-between"
-                          >
-                            <span>{item.name}</span>
-                            <span className="font-medium">x{item.quantity}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex w-full justify-between rounded-md bg-muted p-4 text-lg font-semibold">
-                        <span>Total</span>
-                        <span>€{total.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
               </CardFooter>
             </Card>
           </div>
         </div>
       </PageWrapper>
+
+       {/* Confirmation Dialog */}
+      <Dialog
+          open={showConfirmation}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) {
+              resetPOS();
+            }
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-headline text-accent">
+                Dispense Confirmed
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p>
+                The following items have been dispensed to{' '}
+                <span className="font-bold">{selectedMember?.name}</span>:
+              </p>
+              <div className="space-y-2 rounded-md border p-4">
+                {cart.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex justify-between"
+                  >
+                    <span>{item.name}</span>
+                    <span className="font-medium">x{item.quantity}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex w-full justify-between rounded-md bg-muted p-4 text-lg font-semibold">
+                <span>Total</span>
+                <span>€{total.toFixed(2)}</span>
+              </div>
+              <Button onClick={resetPOS} className="w-full">
+                Start New Sale
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
     </>
   );
 }
