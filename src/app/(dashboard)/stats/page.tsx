@@ -39,24 +39,6 @@ interface ChartDataItem {
     fill: string;
 }
 
-const groupColors: Record<string, string> = {
-    'Flowers': 'hsl(var(--color-flowers))',
-    'Oils': 'hsl(var(--color-oils))',
-    'Edibles': 'hsl(var(--color-edibles))',
-    'Vapes': 'hsl(var(--color-vapes))',
-    'Topicals': 'hsl(var(--color-topicals))',
-    'Default': 'hsl(var(--color-other))',
-};
-
-const categoryColors: string[] = [
-    'hsl(var(--color-cat-1))',
-    'hsl(var(--color-cat-2))',
-    'hsl(var(--color-cat-3))',
-    'hsl(var(--color-cat-4))',
-    'hsl(var(--color-cat-5))',
-    'hsl(var(--color-cat-6))',
-];
-
 export default function StatsPage() {
   const clubId = useAuthStore((state) => state.clubId);
   
@@ -149,16 +131,15 @@ export default function StatsPage() {
             stockByCategory[category] = (stockByCategory[category] || 0) + stock;
         });
 
-        const groupData: ChartDataItem[] = Object.entries(stockByGroup).map(([name, value]) => ({
-            name,
-            value,
-            fill: groupColors[name] || groupColors['Default'],
-        }));
+        const chartColors = [
+            'var(--color-flowers)', 'var(--color-oils)', 'var(--color-edibles)', 
+            'var(--color-vapes)', 'var(--color-topicals)'
+        ];
 
-        const categoryData: ChartDataItem[] = Object.entries(stockByCategory).map(([name, value], index) => ({
-            name,
-            value,
-            fill: categoryColors[index % categoryColors.length],
+        const stockData = Object.entries(stockByCategory).map(([category, stock], index) => ({
+            category,
+            stock,
+            fill: chartColors[index % chartColors.length]
         }));
 
         setGroupDistributionData(groupData);
