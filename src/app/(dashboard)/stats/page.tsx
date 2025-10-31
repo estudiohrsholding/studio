@@ -8,11 +8,10 @@ import {
   collection,
   query,
   onSnapshot,
-  where,
-  Timestamp,
   orderBy,
+  Timestamp,
 } from 'firebase/firestore';
-import { subDays, startOfDay, endOfDay, format } from 'date-fns';
+import { subDays, startOfDay, format } from 'date-fns';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { PageWrapper } from '@/components/dashboard/page-wrapper';
 import { DailySalesChart } from '@/components/dashboard/stats/daily-sales-chart';
@@ -33,24 +32,25 @@ interface DailySale {
   sales: number;
 }
 
-interface StockDistribution {
-  category: string;
-  stock: number;
-  fill: string;
+interface HierarchicalStockData {
+    name: string;
+    children: {
+        name: string;
+        value: number;
+    }[];
 }
 
-// Predefined color palette for chart segments
 const chartColors = [
-    'var(--color-flowers)', 'var(--color-oils)', 'var(--color-edibles)', 
-    'var(--color-vapes)', 'var(--color-topicals)', 'var(--color-other)'
+    'hsl(var(--color-flowers))', 'hsl(var(--color-oils))', 'hsl(var(--color-edibles))', 
+    'hsl(var(--color-vapes))', 'hsl(var(--color-topicals))', 'hsl(var(--color-other))'
 ];
 
 export default function StatsPage() {
   const clubId = useAuthStore((state) => state.clubId);
   
   const [dailySalesData, setDailySalesData] = useState<DailySale[]>([]);
-  const [stockDistributionData, setStockDistributionData] = useState<StockDistribution[]>([]);
   const [lowStockItems, setLowStockItems] = useState<Item[]>([]);
+  const [hierarchicalStockData, setHierarchicalStockData] = useState<HierarchicalStockData[]>([]);
   
   const [isSalesLoading, setIsSalesLoading] = useState(true);
   const [isStockLoading, setIsStockLoading] = useState(true);
@@ -74,10 +74,9 @@ export default function StatsPage() {
     const unsubscribe = onSnapshot(transactionsQuery, (snapshot) => {
       const salesByDay: Record<string, number> = {};
 
-      // Initialize sales for the last 7 days to 0
       for (let i = 0; i < 7; i++) {
         const date = subDays(today, i);
-        const dayKey = format(date, 'E'); // 'Mon', 'Tue', etc.
+        const dayKey = format(date, 'E'); 
         salesByDay[dayKey] = 0;
       }
       
@@ -96,7 +95,7 @@ export default function StatsPage() {
 
       const chartData = Object.entries(salesByDay)
         .map(([day, sales]) => ({ day, sales }))
-        .reverse(); // To have the oldest day first
+        .reverse();
 
       setDailySalesData(chartData);
       setIsSalesLoading(false);
@@ -123,24 +122,37 @@ export default function StatsPage() {
 
     const unsubscribe = onSnapshot(inventoryQuery, (snapshot) => {
         const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Item));
-        const stockByCategory: Record<string, number> = {};
-
+        
+        // --- Hierarchical Data Processing ---
+        const stockByGroupAndCategory: Record<string, Record<string, number>> = {};
+        
         items.forEach(item => {
+            const group = item.group || 'Uncategorized';
             const category = item.category || 'Uncategorized';
-            if (!stockByCategory[category]) {
-                stockByCategory[category] = 0;
+            
+            if (!stockByGroupAndCategory[group]) {
+                stockByGroupAndCategory[group] = {};
             }
-            stockByCategory[category] += item.stockLevel;
+            if (!stockByGroupAndCategory[group][category]) {
+                stockByGroupAndCategory[group][category] = 0;
+            }
+            stockByGroupAndCategory[group][category] += item.stockLevel;
         });
 
-        // Assign colors from the predefined palette
-        const stockData = Object.entries(stockByCategory).map(([category, stock], index) => ({
-            category,
-            stock,
-            fill: chartColors[index % chartColors.length]
-        }));
-        
-        setStockDistributionData(stockData);
+        const hierarchicalData: HierarchicalStockData[] = Object.entries(stockByGroupAndCategory).map(([groupName, categories], groupIndex) => {
+            const children = Object.entries(categories).map(([categoryName, stock]) => ({
+                name: categoryName,
+                value: stock,
+            }));
+            
+            return {
+                name: groupName,
+                children: children,
+                fill: chartColors[groupIndex % chartColors.length]
+            };
+        });
+
+        setHierarchicalStockData(hierarchicalData);
         setLowStockItems(items.filter(item => item.stockLevel < 20));
         setIsStockLoading(false);
     }, (error) => {
@@ -169,7 +181,7 @@ export default function StatsPage() {
                     <DailySalesChart data={dailySalesData} />
                 </div>
                 <div className="lg:col-span-1">
-                    <StockLevelsChart data={stockDistributionData} />
+                    <StockLevelsChart data={hierarchicalStockData} />
                 </div>
                 <div className="lg:col-span-3">
                     <LowStockItems items={lowStockItems} />

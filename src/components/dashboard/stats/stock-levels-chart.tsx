@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { TrendingUp } from 'lucide-react';
-import { Label, Pie, PieChart } from 'recharts';
+import { Pie, PieChart } from 'recharts';
 
 import {
   Card,
@@ -22,45 +22,60 @@ import {
   ChartLegendContent,
 } from '@/components/ui/chart';
 
-interface StockData {
-    category: string;
-    stock: number;
+interface HierarchicalStockData {
+    name: string;
+    children: {
+        name: string;
+        value: number;
+    }[];
     fill: string;
 }
 
 interface StockLevelsChartProps {
-    data: StockData[];
+    data: HierarchicalStockData[];
 }
 
 const chartConfig = {
   stock: {
     label: 'Stock',
   },
-  // Dynamic keys will be added from props
 } satisfies ChartConfig;
 
+// This component will now render a hierarchical chart (like a sunburst).
+// For now, we'll render the top-level groups in a Pie Chart as a placeholder.
 export function StockLevelsChart({ data = [] }: StockLevelsChartProps) {
   const totalStock = React.useMemo(() => {
-    return data.reduce((acc, curr) => acc + curr.stock, 0);
+    return data.reduce((acc, group) => {
+      const groupTotal = group.children.reduce((childAcc, child) => childAcc + child.value, 0);
+      return acc + groupTotal;
+    }, 0);
+  }, [data]);
+
+  const topLevelData = React.useMemo(() => {
+    return data.map(group => ({
+        name: group.name,
+        value: group.children.reduce((acc, child) => acc + child.value, 0),
+        fill: group.fill,
+    }));
   }, [data]);
 
   const dynamicChartConfig = React.useMemo(() => {
     const config: ChartConfig = { ...chartConfig };
-    data.forEach(item => {
-        config[item.category] = {
-            label: item.category,
+    topLevelData.forEach(item => {
+        config[item.name] = {
+            label: item.name,
             color: item.fill,
         };
     });
     return config;
-  }, [data]);
+  }, [topLevelData]);
 
 
   return (
     <Card className="flex flex-col">
       <CardHeader className="items-center pb-0">
-        <CardTitle className="font-headline">Total Stock by Category</CardTitle>
-        <CardDescription>Distribution of items across categories</CardDescription>
+        <CardTitle className="font-headline">Stock by Group</CardTitle>
+        <CardDescription>Hierarchical distribution of items</CardDescription>
       </CardHeader>
       <CardContent className="flex-1 pb-0">
         {data.length > 0 ? (
@@ -69,51 +84,21 @@ export function StockLevelsChart({ data = [] }: StockLevelsChartProps) {
                 className="mx-auto aspect-square max-h-[300px]"
             >
                 <PieChart>
-                <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent hideLabel />}
-                />
-                <Pie
-                    data={data}
-                    dataKey="stock"
-                    nameKey="category"
-                    innerRadius={60}
-                    strokeWidth={5}
-                >
-                    <Label
-                        content={({ viewBox }) => {
-                            if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
-                            return (
-                                <text
-                                x={viewBox.cx}
-                                y={viewBox.cy}
-                                textAnchor="middle"
-                                dominantBaseline="middle"
-                                >
-                                <tspan
-                                    x={viewBox.cx}
-                                    y={viewBox.cy}
-                                    className="fill-foreground text-3xl font-bold"
-                                >
-                                    {totalStock.toLocaleString()}
-                                </tspan>
-                                <tspan
-                                    x={viewBox.cx}
-                                    y={(viewBox.cy || 0) + 24}
-                                    className="fill-muted-foreground"
-                                >
-                                    Units
-                                </tspan>
-                                </text>
-                            );
-                            }
-                        }}
+                    <ChartTooltip
+                        cursor={false}
+                        content={<ChartTooltipContent hideLabel />}
                     />
-                </Pie>
-                 <ChartLegend
-                    content={<ChartLegendContent nameKey="category" />}
-                    className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
+                    <Pie
+                        data={topLevelData}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={60}
+                        strokeWidth={5}
                     />
+                     <ChartLegend
+                        content={<ChartLegendContent nameKey="name" />}
+                        className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
+                        />
                 </PieChart>
             </ChartContainer>
          ) : (
@@ -127,7 +112,7 @@ export function StockLevelsChart({ data = [] }: StockLevelsChartProps) {
           Total Stock: {totalStock} units
         </div>
         <div className="leading-none text-muted-foreground">
-          Showing total stock across all categories
+          Showing total stock across all groups.
         </div>
       </CardFooter>
     </Card>
