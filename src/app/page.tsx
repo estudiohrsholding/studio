@@ -18,6 +18,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
 
 function LoginPageContent() {
   const [email, setEmail] = useState('');
@@ -162,9 +163,46 @@ function LoginPageContent() {
 }
 
 
+function LoginPageSkeleton() {
+  return (
+     <div className="flex min-h-screen w-full items-center justify-center bg-background px-4">
+      <div className="w-full max-w-md">
+        <div className="mb-8 flex flex-col items-center">
+          <Logo className="h-12 w-12 text-primary" />
+          <h1 className="mt-4 font-headline text-3xl font-bold tracking-tight">
+            ClubConnect
+          </h1>
+          <p className="text-muted-foreground">
+            The central hub for your club.
+          </p>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-headline">Club Login</CardTitle>
+            <CardDescription>
+              Enter your credentials to access your club dashboard.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<LoginPageSkeleton />}>
       <LoginPageContent />
     </Suspense>
   )
