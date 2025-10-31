@@ -10,16 +10,16 @@ export function getMemberStatusTag(
     isVetoed: boolean
 ): MemberStatus {
     
-    // Red (Vetoed) - Highest priority
+    // Priority 1 (Red): Vetoed status overrides everything.
     if (isVetoed) {
         return { colorClass: 'bg-red-600', statusText: 'VETOED' };
     }
 
-    // Gray (Expired/Inactive)
-    if (!expiresAt || expiresAt.toDate() < new Date()) {
-        return { colorClass: 'bg-gray-500', statusText: 'EXPIRED' };
+    // Priority 2 (Green): If not vetoed and expiration is in the future.
+    if (expiresAt && expiresAt.toDate() > new Date()) {
+        return { colorClass: 'bg-green-600', statusText: 'ACTIVE' };
     }
 
-    // Green (Active)
-    return { colorClass: 'bg-green-600', statusText: 'ACTIVE' };
+    // Priority 3 (Gray): If not vetoed but expired or never had a membership.
+    return { colorClass: 'bg-gray-500', statusText: 'EXPIRED' };
 }

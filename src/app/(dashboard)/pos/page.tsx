@@ -23,7 +23,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogDescription,
 } from '@/components/ui/dialog';
 import { useAuthStore } from '@/store/authStore';
@@ -55,19 +54,14 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { ChevronsUpDown } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { mockUser } from '@/lib/data';
+import { calculateNewExpiration } from '@/lib/utils/timeUtils';
+import type { Member } from '@/lib/types';
 
 interface CartItem extends Item {
   quantity: number;
-}
-
-interface Member {
-  id: string;
-  name: string;
-  email: string;
-  avatar: string;
 }
 
 export default function POSPage() {
@@ -215,26 +209,29 @@ export default function POSPage() {
     const numericQuantity = parseFloat(quantity);
     if (!selectedItem || isNaN(numericQuantity) || numericQuantity <= 0) return;
 
-    // --- Task 1: Stock Validation Logic ---
-    const itemInStock = selectedItem.stockLevel;
-    if (numericQuantity > itemInStock) {
-        setFormError(`Not enough stock. Only ${itemInStock} available.`);
-        return; // Stop the item from being added
+    // Do not check stock for membership items
+    if (!selectedItem.isMembership) {
+        const itemInStock = selectedItem.stockLevel;
+        if (numericQuantity > itemInStock) {
+            setFormError(`Not enough stock. Only ${itemInStock} available.`);
+            return; // Stop the item from being added
+        }
     }
-    // --- End Task 1 ---
   
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === selectedItem.id);
       if (existingItem) {
-        // Additional check for adding to existing cart item
-        const newTotalQuantity = existingItem.quantity + numericQuantity;
-        if (newTotalQuantity > itemInStock) {
-            setFormError(`Not enough stock. You have ${existingItem.quantity} in cart, only ${itemInStock - existingItem.quantity} more available.`);
-            return prevCart;
+        if (!selectedItem.isMembership) {
+            const itemInStock = selectedItem.stockLevel;
+            const newTotalQuantity = existingItem.quantity + numericQuantity;
+            if (newTotalQuantity > itemInStock) {
+                setFormError(`Not enough stock. You have ${existingItem.quantity} in cart, only ${itemInStock - existingItem.quantity} more available.`);
+                return prevCart;
+            }
         }
         return prevCart.map((item) =>
           item.id === selectedItem.id
-            ? { ...item, quantity: newTotalQuantity }
+            ? { ...item, quantity: item.quantity + numericQuantity }
             : item
         );
       }
@@ -268,9 +265,8 @@ export default function POSPage() {
     const batch = writeBatch(db);
 
     try {
-        // --- Operation 1: Create the Transaction Document ---
         const transactionDocRef = doc(collection(db, 'clubs', clubId, 'transactions'));
-        const transactionData = {
+        batch.set(transactionDocRef, {
             memberId: selectedMember.id,
             memberName: selectedMember.name,
             cart: cart.map(item => ({ 
@@ -280,22 +276,30 @@ export default function POSPage() {
                 amount: (item.amountPerUnit || 0) * item.quantity 
             })),
             totalAmount: total,
-            dispensedBy: mockUser.name, // Replace with actual user in a real app
+            dispensedBy: mockUser.name,
             transactionDate: serverTimestamp(),
             type: 'dispense',
             clubId: clubId
-        };
-        batch.set(transactionDocRef, transactionData);
+        });
         
-        // --- Operations 2 & 3: Loop through cart ---
         for (const item of cart) {
-            // Operation 2: Decrement Inventory
-            const itemDocRef = doc(db, 'clubs', clubId, 'inventoryItems', item.id);
-            batch.update(itemDocRef, { stockLevel: increment(-item.quantity) });
+            if (item.isMembership && item.duration) {
+                // --- Membership Logic ---
+                const memberDocRef = doc(db, 'clubs', clubId, 'members', selectedMember.id);
+                const newExpiration = calculateNewExpiration(item.duration);
+                batch.update(memberDocRef, {
+                    membershipExpiresAt: newExpiration,
+                    isVetoed: false // Selling a membership un-vetoes a user
+                });
+            } else {
+                // --- Standard Item Logic ---
+                const itemDocRef = doc(db, 'clubs', clubId, 'inventoryItems', item.id);
+                batch.update(itemDocRef, { stockLevel: increment(-item.quantity) });
+            }
 
-            // Operation 3: Create Audit Log (using transactions collection for simplicity)
+            // --- Universal Audit Log for each item ---
             const logDocRef = doc(collection(db, 'clubs', clubId, 'transactions'));
-            const logData = { 
+            batch.set(logDocRef, { 
                 type: 'dispense-log', 
                 transactionDate: serverTimestamp(), 
                 itemId: item.id, 
@@ -304,21 +308,16 @@ export default function POSPage() {
                 amount: (item.amountPerUnit || 0) * item.quantity,
                 memberId: selectedMember.id,
                 memberName: selectedMember.name,
-                user: mockUser.name, // Replace with actual user
+                user: mockUser.name,
                 clubId: clubId
-            };
-            batch.set(logDocRef, logData);
+            });
         }
 
-        console.log('%c[DEBUG SALE] Committing batch...', 'color: #00FF00');
         await batch.commit();
-        console.log('%c[DEBUG SALE] Batch commit SUCCESS!', 'color: #00FF00');
-        
-        // --- Success ---
-        setShowConfirmation(true); // Show confirmation dialog on success
+        setShowConfirmation(true);
 
     } catch (error: any) {
-        console.error('%c[DEBUG SALE] CRITICAL FAILURE: Batch failed!', 'color: #FF0000', error);
+        console.error('Sale Failed:', error);
         toast({
             variant: "destructive",
             title: "Sale Failed",
@@ -479,7 +478,7 @@ export default function POSPage() {
                         onChange={(e) => handleQuantityChange(e.target.value)}
                         min="0"
                         step={isIntegerOnly ? '1' : '0.01'}
-                        disabled={!selectedItem}
+                        disabled={!selectedItem || selectedItem?.isMembership}
                       />
                     </div>
                     <div className="sm:col-span-1">
@@ -597,9 +596,7 @@ export default function POSPage() {
         >
           <DialogContent>
             <DialogHeader>
-              <DialogTitle className="font-headline text-accent">
-                Dispense Confirmed
-              </DialogTitle>
+              <DialogTitle className="font-headline text-accent">Dispense Confirmed</DialogTitle>
               <DialogDescription>
                 The sale has been successfully processed and recorded.
               </DialogDescription>
@@ -633,5 +630,3 @@ export default function POSPage() {
     </>
   );
 }
-
-    
