@@ -1,3 +1,4 @@
+
 import { create } from 'zustand';
 
 interface AuthState {
@@ -14,20 +15,17 @@ export const useAuthStore = create<AuthState>((set) => ({
   uid: null,
   clubId: null,
   role: null,
-  isLoading: true, // Important: start as true
+  isLoading: true, // Important: start as true to prevent premature rendering
 
   setLoginData: (data) => {
-    console.log('%c[DEBUG ZUSTAND] 9. setLoginData action executed! New clubId:', 'color: #0000FF', data.clubId);
     set({ uid: data.uid, clubId: data.clubId, role: data.role });
   },
 
   logout: () => {
-    console.log('%c[DEBUG ZUSTAND] logout action executed!', 'color: #0000FF');
     set({ uid: null, clubId: null, role: null });
   },
 
   setLoading: (loading) => {
-    console.log('%c[DEBUG ZUSTAND] setLoading action executed! isLoading:', 'color: #0000FF', loading);
     set({ isLoading: loading });
   },
 }));

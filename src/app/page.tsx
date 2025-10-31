@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
@@ -33,43 +34,29 @@ function LoginPageContent() {
     if (message) {
       setSuccessMessage(decodeURIComponent(message));
     }
+     const authError = searchParams.get('error');
+    if (authError === 'auth_error') {
+      setError("Your account doesn't have the required permissions. Please contact support.");
+    }
   }, [searchParams]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    console.log('%c[DEBUG LOGIN] 1. handleSubmit: Triggered.', 'color: #00FF00');
     setIsLoading(true);
     setError(null);
 
     try {
       const auth = getAuth();
-      const setLoginData = useAuthStore.getState().setLoginData;
-
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      console.log('%c[DEBUG LOGIN] 2. Auth: User authenticated:', 'color: #00FF00', user.uid);
-
-      console.log('[DEBUG LOGIN] 3. Claims: Forcing token refresh to get claims...');
-      const idTokenResult = await user.getIdTokenResult(true);
-      const { clubId, role } = idTokenResult.claims;
-      console.log('%c[DEBUG LOGIN] 4. Claims: Claims retrieved! clubId is:', 'color: #FFA500', clubId);
-
-      if (!clubId) {
-        console.error('%c[DEBUG LOGIN] 5. FAILURE: No clubId found in claims!', 'color: #FF0000');
-        setError('This account is not associated with a club.');
-        setIsLoading(false);
-        return;
-      }
-
-      console.log('[DEBUG LOGIN] 6. Zustand: Calling setLoginData...');
-      setLoginData({ uid: user.uid, clubId: clubId as string, role: role as string });
-      console.log('%c[DEBUG LOGIN] 7. Zustand: Global state updated!', 'color: #00FF00');
-
-      console.log('[DEBUG LOGIN] 8. Router: Redirecting to /home...');
+      // The DashboardLayout will now handle claims fetching.
+      // We just need to sign in here.
+      await signInWithEmailAndPassword(auth, email, password);
+      
+      // On successful sign-in, the onAuthStateChanged listener in FirebaseProvider
+      // will trigger, and the DashboardLayout will handle the redirection and
+      // claim-checking logic.
       router.push('/home');
 
     } catch (err: any) {
-      console.error('%c[DEBUG LOGIN] CRITICAL FAILURE in try block:', 'color: #FF0000', err.message);
       let errorMessage = 'An unexpected error occurred. Please try again.';
       if (err.code) {
         switch (err.code) {
@@ -79,8 +66,6 @@ function LoginPageContent() {
             errorMessage = 'Invalid credentials. Please check your email and password.';
             break;
         }
-      } else if (err.message.startsWith('AUTH_ERR:')) {
-        errorMessage = err.message;
       }
       setError(errorMessage);
     } finally {
