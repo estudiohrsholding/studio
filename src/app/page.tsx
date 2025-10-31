@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, Suspense } from 'react';
@@ -50,22 +51,27 @@ function LoginPageContent() {
       );
       const user = userCredential.user;
 
+      // CRITICAL: Force a token refresh to get the latest custom claims
       const idTokenResult = await user.getIdTokenResult(true);
       const { clubId, role } = idTokenResult.claims;
 
+      // CRITICAL: Validate that the tenant ID (clubId) exists in the claims
       if (!clubId) {
         throw new Error(
           'AUTH_ERR: No tenant (clubId) associated with this account.'
         );
       }
 
+      // CRITICAL: Set the multi-tenant data in the global store
       setLoginData({
         uid: user.uid,
         clubId: clubId as string,
-        role: role as string,
+        role: (role as string) || 'guest',
       });
 
+      // Only redirect AFTER the global state is set
       router.push('/home');
+
     } catch (err: any) {
       setIsLoading(false);
       let errorMessage = 'An unexpected error occurred. Please try again.';
