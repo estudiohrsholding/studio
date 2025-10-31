@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { Pie, PieChart } from 'recharts';
+import { Pie, PieChart, Cell } from 'recharts';
 
 import {
   Card,
@@ -77,7 +77,11 @@ export function CategoryDistributionChart({ data = [] }: CategoryDistributionCha
                         nameKey="name"
                         innerRadius={60}
                         strokeWidth={5}
-                    />
+                    >
+                         {data.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                         ))}
+                    </Pie>
                      <ChartLegend
                         content={<ChartLegendContent nameKey="name" />}
                         className="-translate-y-2 flex-wrap gap-2 [&>*]:basis-1/4 [&>*]:justify-center"
