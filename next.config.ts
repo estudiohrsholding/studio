@@ -2,14 +2,6 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
-  experimental: {
-    // This is to allow cross-origin requests in the development environment.
-    // The need for this is specific to the cloud-based IDE environment.
-    allowedDevOrigins: [
-        'https://*.cloudworkstations.dev',
-        'https://*.firebase.studio',
-    ]
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
