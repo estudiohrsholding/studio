@@ -3,7 +3,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/firebase';
+import { useUser } from '@/firebase';
 import { useAuthStore } from '@/store/authStore';
 import { DashboardSidebar } from '@/components/dashboard/sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,7 +13,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isUserLoading: isAuthLoading } = useAuth(); // Renamed to avoid conflict
+  const { user, isUserLoading: isAuthLoading } = useUser();
   const { clubId, isLoading: isStoreLoading, setLoginData, logout, setLoading } = useAuthStore(state => ({
     clubId: state.clubId,
     isLoading: state.isLoading,
