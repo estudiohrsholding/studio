@@ -5,7 +5,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import Link from 'next/link';
-import { Logo } from '@/components/icons';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -76,7 +76,7 @@ function LoginPageContent() {
     <div className="flex min-h-screen w-full items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center">
-          <Logo className="h-12 w-12 text-primary" />
+          <Image src="/logo.svg" alt="CannabiApp Logo" width={48} height={48} className="h-12 w-12 text-primary"/>
           <h1 className="mt-4 font-headline text-3xl font-bold tracking-tight">
             <span className="text-primary">Cannab</span><span className="text-accent">iA</span><span className="text-primary">pp</span>
           </h1>
@@ -151,7 +151,7 @@ function LoginPageSkeleton() {
      <div className="flex min-h-screen w-full items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center">
-          <Logo className="h-12 w-12 text-primary" />
+          <Skeleton className="h-12 w-12 rounded-full" />
           <h1 className="mt-4 font-headline text-3xl font-bold tracking-tight">
             <span className="text-primary">Cannab</span><span className="text-accent">iA</span><span className="text-primary">pp</span>
           </h1>

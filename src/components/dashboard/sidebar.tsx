@@ -2,6 +2,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   BarChart3,
@@ -23,7 +24,6 @@ import {
   SidebarMenuButton,
   SidebarFooter,
 } from '@/components/ui/sidebar';
-import { Logo } from '@/components/icons';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { mockUser } from '@/lib/data';
@@ -48,7 +48,7 @@ export function DashboardSidebar({ children }: { children: React.ReactNode }) {
             href="/home"
             className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center"
           >
-            <Logo className="size-8 text-primary" />
+            <Image src="/logo.svg" alt="CannabiApp Logo" width={32} height={32} className="size-8" />
             <span className="font-headline text-lg font-semibold group-data-[collapsible=icon]:hidden">
               <span className="text-primary">Cannab</span><span className="text-accent">iA</span><span className="text-primary">pp</span>
             </span>

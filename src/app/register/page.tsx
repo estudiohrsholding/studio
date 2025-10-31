@@ -1,7 +1,9 @@
+
 'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
   getAuth,
@@ -9,7 +11,6 @@ import {
   deleteUser,
 } from 'firebase/auth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { Logo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -113,7 +114,7 @@ export default function RegisterClubPage() {
     <div className="flex min-h-screen w-full items-center justify-center bg-background px-4 py-12">
       <div className="w-full max-w-md">
         <div className="mb-8 flex flex-col items-center">
-          <Logo className="h-12 w-12 text-primary" />
+          <Image src="/logo.svg" alt="CannabiApp Logo" width={48} height={48} className="h-12 w-12 text-primary"/>
           <h1 className="mt-4 font-headline text-3xl font-bold tracking-tight">
             Register a New Club
           </h1>
