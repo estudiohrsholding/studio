@@ -59,8 +59,7 @@ export default function StatsPage() {
     const transactionsQuery = query(
       collection(getFirestore(), 'clubs', clubId, 'transactions'),
       where('type', '==', 'dispense-log'),
-      where('transactionDate', '>=', sevenDaysAgo),
-      orderBy('transactionDate', 'desc')
+      where('transactionDate', '>=', sevenDaysAgo)
     );
 
     const unsubscribe = onSnapshot(transactionsQuery, (snapshot) => {
