@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -117,7 +118,7 @@ const AlertDialogCancel = React.forwardRef<
   <AlertDialogPrimitive.Cancel
     ref={ref}
     className={cn(
-      buttonVariants({ variant: "outline" }),
+      buttonVariants({ variant: "destructive" }),
       "mt-2 sm:mt-0",
       className
     )}
@@ -139,3 +140,5 @@ export {
   AlertDialogAction,
   AlertDialogCancel,
 }
+
+    

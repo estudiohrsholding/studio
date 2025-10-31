@@ -2,7 +2,7 @@
 'use client';
 
 import Image from 'next/image';
-import { PlusCircle, Camera, Paperclip, X } from 'lucide-react';
+import { PlusCircle, Camera, Paperclip, X, Edit, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -34,7 +34,7 @@ import { DashboardHeader } from '@/components/dashboard/header';
 import { PageWrapper } from '@/components/dashboard/page-wrapper';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useState, useEffect, useRef, type FormEvent } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   getFirestore,
   collection,
@@ -43,6 +43,9 @@ import {
   query,
   orderBy,
   onSnapshot,
+  doc,
+  writeBatch,
+  updateDoc
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -55,6 +58,8 @@ import { useFirebase } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { v4 as uuidv4 } from 'uuid';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Checkbox } from "@/components/ui/checkbox";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 interface Member {
   id: string;
@@ -84,14 +89,11 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
     setError(null);
     let stream: MediaStream | null = null;
     try {
-      // First, try to get the environment-facing (rear) camera
       stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment' },
       });
     } catch (err) {
-      console.warn('Rear camera not found or failed, falling back. Error:', err);
       try {
-        // If the rear camera fails, fall back to any available camera
         stream = await navigator.mediaDevices.getUserMedia({ video: true });
       } catch (finalErr) {
         console.error('Camera access denied:', finalErr);
@@ -139,45 +141,33 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
     }
   };
 
-
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    console.log('%c[DEBUG] 1. handleSubmit: Triggered.', 'color: #00FF00');
   
     const clubId = useAuthStore.getState().clubId;
     const data = { fullName, email, idPhoto };
   
-    console.log('[DEBUG] 2. Validating input...', { clubId, ...data });
     setIsLoading(true); 
     setError(null);
   
     if (!clubId) {
-      console.error('%c[DEBUG] 3. FAILURE: clubId is null.', 'color: #FF0000');
       setError('Could not identify the club. Please log in again.');
       setIsLoading(false);
       return;
     }
     if (!data.fullName || !data.email || !data.idPhoto) {
-      console.error('%c[DEBUG] 3. FAILURE: Form is incomplete.', 'color: #FF0000');
       setError('Please fill out all fields and select or capture an ID photo.');
       setIsLoading(false);
       return;
     }
   
     try {
-      console.log('[DEBUG] 4. Creating Storage reference...');
       const storage = getStorage();
       const uniqueFileName = `${uuidv4()}-${data.idPhoto.name}`;
       const storageRef = ref(storage, `clubs/${clubId}/member_ids/${uniqueFileName}`);
-      console.log('%c[DEBUG] 5. Storage Path:', 'color: #00FFFF', storageRef.path);
   
-      console.log('[DEBUG] 6. Awaiting uploadBytes()...');
       await uploadBytes(storageRef, data.idPhoto);
-      console.log('%c[DEBUG] 7. SUCCESS: File Uploaded.', 'color: #00FF00');
-  
-      console.log('[DEBUG] 8. Awaiting getDownloadURL()...');
       const downloadURL = await getDownloadURL(storageRef);
-      console.log('%c[DEBUG] 9. SUCCESS: Got URL:', 'color: #00FF00', downloadURL);
   
       const newMemberData = {
         name: data.fullName,
@@ -187,20 +177,15 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
         createdAt: serverTimestamp(),
         avatar: `https://picsum.photos/seed/${uuidv4()}/200/200`,
       };
-      console.log('[DEBUG] 10. Built Firestore object:', newMemberData);
   
       const db = getFirestore();
       const membersColRef = collection(db, 'clubs', clubId, 'members');
-      console.log('[DEBUG] 11. Awaiting addDoc()...');
       await addDoc(membersColRef, newMemberData);
-      console.log('%c[DEBUG] 12. SUCCESS: Doc written to Firestore.', 'color: #00FF00');
   
-      console.log('[DEBUG] 13. Calling onMemberAdded()...');
       onMemberAdded(); 
   
     } catch (error: any) {
-      console.error('%c[DEBUG] 14. CRITICAL FAILURE in try block:', 'color: #FF0000', error.code, error.message);
-      console.error(error);
+      console.error('Member creation failed:', error.code, error.message);
       if (error.code === 'storage/unauthorized') {
         setError("Upload failed due to a permissions issue. This is often caused by an issue with security rules or the user's authentication token. Please ensure your storage rules are correct and you are properly authenticated.");
       } else if (error.code === 'storage/object-not-found') {
@@ -211,7 +196,6 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
         setError(`An unexpected error occurred: ${error.message}`);
       }
     } finally {
-      console.log('[DEBUG] 15. Finally block executed.');
       setIsLoading(false);
     }
   };
@@ -352,11 +336,77 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
   );
 }
 
-function MembersList() {
+
+function EditMemberDialog({ member, onUpdate, onOpenChange }: { member: Member | null; onUpdate: () => void; onOpenChange: (open: boolean) => void; }) {
+    const [fullName, setFullName] = useState('');
+    const [email, setEmail] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const clubId = useAuthStore((state) => state.clubId);
+
+    useEffect(() => {
+        if (member) {
+            setFullName(member.name);
+            setEmail(member.email);
+        }
+    }, [member]);
+
+    const handleSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!member || !clubId) return;
+
+        setIsLoading(true);
+        const updatedData = { name: fullName, email: email };
+
+        try {
+            const db = getFirestore();
+            const memberDocRef = doc(db, 'clubs', clubId, 'members', member.id);
+            await updateDoc(memberDocRef, updatedData);
+            onUpdate(); // This will close the dialog and reset selections
+        } catch (error) {
+            console.error("Failed to update member:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <Dialog open={!!member} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Edit Member</DialogTitle>
+                    <DialogDescription>Update the details for {member?.name}.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit}>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="edit-name" className="text-right">Full Name</Label>
+                            <Input id="edit-name" value={fullName} onChange={(e) => setFullName(e.target.value)} className="col-span-3" required />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="edit-email" className="text-right">Email</Label>
+                            <Input id="edit-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" required />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="submit" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Changes'}</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+export default function MembersPage() {
+  const [dialogKey, setDialogKey] = useState(0);
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { firestore } = useFirebase();
   const clubId = useAuthStore((state) => state.clubId);
+  
+  // --- Selection State ---
+  const [selectedMembers, setSelectedMembers] = useState(new Set<string>());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [memberToEdit, setMemberToEdit] = useState<Member | null>(null);
 
   useEffect(() => {
     if (!clubId) {
@@ -366,7 +416,6 @@ function MembersList() {
     }
     
     const db = getFirestore();
-
     const membersQuery = query(
       collection(db, 'clubs', clubId, 'members'),
       orderBy('createdAt', 'desc')
@@ -390,116 +439,73 @@ function MembersList() {
     return () => unsubscribe();
   }, [clubId]);
 
-  if (isLoading) {
-    return (
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Client ID</TableHead>
-            <TableHead>Joined Date</TableHead>
-            <TableHead>ID Photo</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {[...Array(5)].map((_, i) => (
-            <TableRow key={i}>
-              <TableCell>
-                <div className="flex items-center gap-3">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <div className="space-y-1">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-40" />
-                  </div>
-                </div>
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-6 w-24" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-4 w-28" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-10 w-10" />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    );
-  }
+  // --- Selection Logic ---
+  const handleToggleSelect = (memberId: string) => {
+    setSelectedMembers(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(memberId)) {
+            newSet.delete(memberId);
+        } else {
+            newSet.add(memberId);
+        }
+        return newSet;
+    });
+  };
 
-  if (members.length === 0) {
-    return (
-      <div className="py-16 text-center text-muted-foreground">
-        No members found. Add your first member to get started!
-      </div>
-    );
-  }
+  const handleSelectAll = (isChecked: boolean) => {
+    if (isChecked) {
+        setSelectedMembers(new Set(members.map(member => member.id)));
+    } else {
+        setSelectedMembers(new Set());
+    }
+  };
 
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Client ID</TableHead>
-          <TableHead>Joined Date</TableHead>
-          <TableHead>ID Photo</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {members.map((member) => (
-          <TableRow key={member.id}>
-            <TableCell>
-              <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarImage
-                    src={member.avatar}
-                    alt={member.name}
-                    data-ai-hint="person portrait"
-                  />
-                  <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <div className="font-medium">{member.name}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {member.email}
-                  </div>
-                </div>
-              </div>
-            </TableCell>
-            <TableCell>
-              <Badge variant="outline">{member.id}</Badge>
-            </TableCell>
-            <TableCell>
-              {member.createdAt
-                ? new Date(
-                    member.createdAt.seconds * 1000
-                  ).toLocaleDateString()
-                : 'N/A'}
-            </TableCell>
-             <TableCell>
-              {member.idPhotoUrl && (
-                <a href={member.idPhotoUrl} target="_blank" rel="noopener noreferrer">
-                  <Image
-                    src={member.idPhotoUrl}
-                    alt={`${member.name} ID photo`}
-                    width={40}
-                    height={40}
-                    className="rounded-md object-cover"
-                  />
-                </a>
-              )}
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
+  const handleOpenEditModal = () => {
+    if (selectedMembers.size !== 1) return;
+    const editId = selectedMembers.values().next().value;
+    const member = members.find(m => m.id === editId);
+    if (member) {
+        setMemberToEdit(member);
+    }
+  };
 
-export default function MembersPage() {
-  const [dialogKey, setDialogKey] = useState(0);
+  const handleDeleteSelected = async () => {
+    console.log(`[DELETE] 1. handleDeleteSelected: Triggered for ${selectedMembers.size} members.`);
+    if (!clubId || selectedMembers.size === 0) {
+        console.error('[DELETE] 2. FAILURE: clubId is null or no members selected.');
+        return;
+    }
+
+    const db = getFirestore();
+    const batch = writeBatch(db);
+    console.log('[DELETE] 3. WriteBatch created.');
+
+    try {
+        selectedMembers.forEach(memberId => {
+            const memberDocRef = doc(db, 'clubs', clubId, 'members', memberId);
+            console.log(`[DELETE] 4. Queuing deletion for: ${memberDocRef.path}`);
+            batch.delete(memberDocRef);
+        });
+
+        console.log('[DELETE] 5. Attempting atomic batch.commit()...');
+        await batch.commit();
+        console.log('%c[DELETE] 6. SUCCESS: batch.commit() completed.', 'color: #00FF00');
+
+        // Finalization on success
+        setSelectedMembers(new Set());
+        setIsSelectionMode(false);
+        console.log('[DELETE] 7. State cleared.');
+
+    } catch (error: any) {
+        console.error('%c[DELETE] 8. CRITICAL FAILURE in try block:', 'color: #FF0000', error.message);
+        console.error(error);
+    }
+  };
+
+
+  const isAllSelected = useMemo(() => {
+    return members.length > 0 && selectedMembers.size === members.length;
+  }, [members, selectedMembers]);
 
   return (
     <>
@@ -514,17 +520,202 @@ export default function MembersPage() {
                   List of all members associated with your club.
                 </CardDescription>
               </div>
-              <AddMemberDialog
-                key={dialogKey}
-                onMemberAdded={() => setDialogKey(prev => prev + 1)}
-              />
+              <div className="flex items-center gap-2">
+                {!isSelectionMode ? (
+                    <Button variant="outline" size="sm" onClick={() => setIsSelectionMode(true)}>Select</Button>
+                ) : (
+                    <Button variant="secondary" size="sm" onClick={() => {
+                        setIsSelectionMode(false);
+                        setSelectedMembers(new Set());
+                    }}>Cancel</Button>
+                )}
+                <AddMemberDialog
+                  key={dialogKey}
+                  onMemberAdded={() => {
+                    setDialogKey(prev => prev + 1);
+                    setIsSelectionMode(false);
+                    setSelectedMembers(new Set());
+                  }}
+                />
+              </div>
             </div>
           </CardHeader>
           <CardContent>
-            <MembersList />
+            {isLoading ? (
+                <Table>
+                    <TableHeader>
+                    <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Client ID</TableHead>
+                        <TableHead>Joined Date</TableHead>
+                        <TableHead>ID Photo</TableHead>
+                    </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                    {[...Array(5)].map((_, i) => (
+                        <TableRow key={i}>
+                        <TableCell>
+                            <div className="flex items-center gap-3">
+                            <Skeleton className="h-10 w-10 rounded-full" />
+                            <div className="space-y-1">
+                                <Skeleton className="h-4 w-32" />
+                                <Skeleton className="h-3 w-40" />
+                            </div>
+                            </div>
+                        </TableCell>
+                        <TableCell>
+                            <Skeleton className="h-6 w-24" />
+                        </TableCell>
+                        <TableCell>
+                            <Skeleton className="h-4 w-28" />
+                        </TableCell>
+                        <TableCell>
+                            <Skeleton className="h-10 w-10" />
+                        </TableCell>
+                        </TableRow>
+                    ))}
+                    </TableBody>
+                </Table>
+                ) : members.length === 0 ? (
+                <div className="py-16 text-center text-muted-foreground">
+                    No members found. Add your first member to get started!
+                </div>
+                ) : (
+                <Table>
+                    <TableHeader>
+                    <TableRow>
+                        <TableHead className="w-12">
+                            {isSelectionMode && (
+                                <Checkbox
+                                    checked={isAllSelected}
+                                    onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                                    aria-label="Select all"
+                                />
+                            )}
+                        </TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Client ID</TableHead>
+                        <TableHead>Joined Date</TableHead>
+                        <TableHead>ID Photo</TableHead>
+                    </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                    {members.map((member) => (
+                        <TableRow key={member.id} data-state={selectedMembers.has(member.id) && "selected"}>
+                        <TableCell>
+                          {isSelectionMode && (
+                            <Checkbox
+                                checked={selectedMembers.has(member.id)}
+                                onCheckedChange={() => handleToggleSelect(member.id)}
+                                aria-label="Select member"
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                            <div className="flex items-center gap-3">
+                            <Avatar>
+                                <AvatarImage
+                                src={member.avatar}
+                                alt={member.name}
+                                data-ai-hint="person portrait"
+                                />
+                                <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <div className="font-medium">{member.name}</div>
+                                <div className="text-sm text-muted-foreground">
+                                {member.email}
+                                </div>
+                            </div>
+                            </div>
+                        </TableCell>
+                        <TableCell>
+                            <Badge variant="outline">{member.id}</Badge>
+                        </TableCell>
+                        <TableCell>
+                            {member.createdAt
+                            ? new Date(
+                                member.createdAt.seconds * 1000
+                                ).toLocaleDateString()
+                            : 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                            {member.idPhotoUrl && (
+                            <a href={member.idPhotoUrl} target="_blank" rel="noopener noreferrer">
+                                <Image
+                                src={member.idPhotoUrl}
+                                alt={`${member.name} ID photo`}
+                                width={40}
+                                height={40}
+                                className="rounded-md object-cover"
+                                />
+                            </a>
+                            )}
+                        </TableCell>
+                        </TableRow>
+                    ))}
+                    </TableBody>
+                </Table>
+            )}
           </CardContent>
         </Card>
+        
+        {selectedMembers.size > 0 && (
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
+                <Card className="flex items-center gap-2 p-3 shadow-2xl">
+                    <p className="text-sm font-medium mr-2">{selectedMembers.size} selected</p>
+                    <Button 
+                        variant="outline"
+                        size="sm"
+                        onClick={handleOpenEditModal}
+                        disabled={selectedMembers.size !== 1}
+                    >
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                    </Button>
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" disabled={selectedMembers.size === 0}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete ({selectedMembers.size})
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the selected {selectedMembers.size} member(s).
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleDeleteSelected}>Continue</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </Card>
+            </div>
+        )}
+
+        <EditMemberDialog 
+            member={memberToEdit}
+            onOpenChange={(open) => {
+                if (!open) {
+                    setMemberToEdit(null);
+                    setSelectedMembers(new Set());
+                    setIsSelectionMode(false);
+                }
+            }}
+            onUpdate={() => {
+                setMemberToEdit(null);
+                setSelectedMembers(new Set());
+                setIsSelectionMode(false);
+            }}
+        />
+
       </PageWrapper>
     </>
   );
 }
+
+    
