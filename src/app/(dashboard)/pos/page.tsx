@@ -1,3 +1,4 @@
+
 'use client';
 
 import { PlusCircle, Trash2 } from 'lucide-react';
@@ -23,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { useAuthStore } from '@/store/authStore';
 import {
@@ -598,6 +600,9 @@ export default function POSPage() {
               <DialogTitle className="font-headline text-accent">
                 Dispense Confirmed
               </DialogTitle>
+              <DialogDescription>
+                The sale has been successfully processed and recorded.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <p>
@@ -628,3 +633,5 @@ export default function POSPage() {
     </>
   );
 }
+
+    
