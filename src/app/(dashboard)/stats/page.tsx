@@ -111,7 +111,7 @@ export default function StatsPage() {
     );
 
     const unsubscribe = onSnapshot(inventoryQuery, (snapshot) => {
-        const items = snapshot.docs.map(doc => doc.data() as Item);
+        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Item));
         const stockByCategory: Record<string, number> = {};
 
         items.forEach(item => {
