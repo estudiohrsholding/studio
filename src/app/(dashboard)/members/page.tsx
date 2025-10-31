@@ -64,43 +64,74 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { firestore } = useFirebase();
-  const clubId = useAuthStore((state) => state.clubId);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!clubId) {
-      console.error(
-        'FATAL: No clubId found, user is not authenticated for a tenant.'
-      );
-      return;
-    }
+    console.log('%c[DEBUG] handleSubmit: Triggered.', 'color: #00FF00');
+
+    console.log('[DEBUG] Form State:', { fullName, email });
+
     setIsLoading(true);
 
-    const membersColRef = collection(firestore, 'clubs', clubId, 'members');
+    const clubId = useAuthStore.getState().clubId;
+    console.log('%c[DEBUG] clubId:', 'color: #FFA500', clubId);
+
+    if (!clubId) {
+      console.error('%c[DEBUG] FAILURE: clubId is null.', 'color: #FF0000');
+      setIsLoading(false);
+      return;
+    }
+
+    const newMemberData = {
+      name: fullName,
+      email: email,
+      avatar: `https://picsum.photos/seed/${Math.random()}/200/200`,
+      createdAt: serverTimestamp(),
+    };
+    console.log('[DEBUG] newMemberData:', newMemberData);
 
     try {
-      await addDoc(membersColRef, {
-        name: fullName,
-        email: email,
-        avatar: `https://picsum.photos/seed/${Math.random()}/200/200`,
-        createdAt: serverTimestamp(),
-      });
-      onMemberAdded(); // Close dialog via parent
-    } catch (error) {
-      console.error('Error adding new member:', error);
+      const db = getFirestore();
+      const membersColRef = collection(db, 'clubs', clubId, 'members');
+      console.log(
+        '%c[DEBUG] Firestore Path:',
+        'color: #00FFFF',
+        membersColRef.path
+      );
+
+      console.log('[DEBUG] Attempting addDoc()...');
+      await addDoc(membersColRef, newMemberData);
+      console.log('%c[DEBUG] SUCCESS: addDoc() completed.', 'color: #00FF00');
+
+      console.log('[DEBUG] Attempting onMemberAdded()...');
+      onMemberAdded();
+      console.log(
+        '%c[DEBUG] SUCCESS: onMemberAdded() called.',
+        'color: #00FF00'
+      );
+    } catch (error: any) {
+      console.error(
+        '%c[DEBUG] CRITICAL FAILURE in try block:',
+        'color: #FF0000',
+        error.message
+      );
+      console.error(error);
     } finally {
+      console.log('[DEBUG] Finally block executing.');
       setIsLoading(false);
     }
   };
 
   return (
-    <Dialog onOpenChange={(isOpen) => {
-      if (!isOpen) {
-        setFullName('');
-        setEmail('');
-        setIsLoading(false);
-      }
-    }}>
+    <Dialog
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setFullName('');
+          setEmail('');
+          setIsLoading(false);
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button size="sm" className="gap-1">
           <PlusCircle className="h-4 w-4" />
@@ -157,7 +188,7 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
 function MembersList() {
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { firestore } = useFirebase();
+  const { firestore }_ = useFirebase();
   const clubId = useAuthStore((state) => state.clubId);
 
   useEffect(() => {
@@ -166,9 +197,11 @@ function MembersList() {
       setIsLoading(false);
       return;
     }
+    
+    const db = getFirestore();
 
     const membersQuery = query(
-      collection(firestore, 'clubs', clubId, 'members'),
+      collection(db, 'clubs', clubId, 'members'),
       orderBy('createdAt', 'desc')
     );
 
@@ -188,7 +221,7 @@ function MembersList() {
     );
 
     return () => unsubscribe();
-  }, [clubId, firestore]);
+  }, [clubId]);
 
   if (isLoading) {
     return (
