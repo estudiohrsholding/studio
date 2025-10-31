@@ -1,3 +1,4 @@
+
 export type User = {
   id: string;
   name: string;
@@ -15,6 +16,7 @@ export type Member = {
   name: string;
   email: string;
   avatar: string;
+  idPhotoUrl: string;
 };
 
 export type Item = {
@@ -41,3 +43,5 @@ export type Transaction = {
   date: string;
   user: string;
 };
+
+    

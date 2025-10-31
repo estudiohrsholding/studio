@@ -44,9 +44,17 @@ import {
   orderBy,
   onSnapshot,
 } from 'firebase/firestore';
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from 'firebase/storage';
 import { useAuthStore } from '@/store/authStore';
 import { useFirebase } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
+import { v4 as uuidv4 } from 'uuid';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface Member {
   id: string;
@@ -57,68 +65,64 @@ interface Member {
     nanoseconds: number;
   } | null;
   avatar: string;
+  idPhotoUrl: string;
 }
 
 function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [idPhoto, setIdPhoto] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { firestore } = useFirebase();
+  const [error, setError] = useState<string | null>(null);
+  const clubId = useAuthStore((state) => state.clubId);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    console.log('%c[DEBUG] handleSubmit: Triggered.', 'color: #00FF00');
-
-    console.log('[DEBUG] Form State:', { fullName, email });
-
     setIsLoading(true);
+    setError(null);
 
-    const clubId = useAuthStore.getState().clubId;
-    console.log('%c[DEBUG] clubId:', 'color: #FFA500', clubId);
-
-    if (!clubId) {
-      console.error('%c[DEBUG] FAILURE: clubId is null.', 'color: #FF0000');
+    if (!clubId || !fullName || !email || !idPhoto) {
+      setError('Please fill out all fields and select an ID photo.');
       setIsLoading(false);
       return;
     }
 
-    const newMemberData = {
-      name: fullName,
-      email: email,
-      avatar: `https://picsum.photos/seed/${Math.random()}/200/200`,
-      createdAt: serverTimestamp(),
-      clubId: clubId, // This line fixes the permission error
-    };
-    console.log('[DEBUG] newMemberData:', newMemberData);
-
     try {
+      // 1. Upload file to Firebase Storage
+      console.log('Uploading file...');
+      const storage = getStorage();
+      const uniqueFileName = `${uuidv4()}-${idPhoto.name}`;
+      const storageRef = ref(
+        storage,
+        `clubs/${clubId}/member_ids/${uniqueFileName}`
+      );
+      await uploadBytes(storageRef, idPhoto);
+
+      // 2. Get the download URL
+      console.log('Getting download URL...');
+      const downloadURL = await getDownloadURL(storageRef);
+
+      // 3. Prepare data and write to Firestore
+      const newMemberData = {
+        name: fullName,
+        email: email,
+        idPhotoUrl: downloadURL,
+        clubId: clubId,
+        createdAt: serverTimestamp(),
+        avatar: `https://picsum.photos/seed/${uuidv4()}/200/200`,
+      };
+
+      console.log('Writing document to Firestore...');
       const db = getFirestore();
       const membersColRef = collection(db, 'clubs', clubId, 'members');
-      console.log(
-        '%c[DEBUG] Firestore Path:',
-        'color: #00FFFF',
-        membersColRef.path
-      );
-
-      console.log('[DEBUG] Attempting addDoc()...');
       await addDoc(membersColRef, newMemberData);
-      console.log('%c[DEBUG] SUCCESS: addDoc() completed.', 'color: #00FF00');
 
-      console.log('[DEBUG] Attempting onMemberAdded()...');
+      // 4. Close modal on success
       onMemberAdded();
-      console.log(
-        '%c[DEBUG] SUCCESS: onMemberAdded() called.',
-        'color: #00FF00'
-      );
-    } catch (error: any) {
-      console.error(
-        '%c[DEBUG] CRITICAL FAILURE in try block:',
-        'color: #FF0000',
-        error.message
-      );
-      console.error(error);
+    } catch (err: any) {
+      console.error('Failed to add member:', err);
+      setError(`An unexpected error occurred: ${err.message}`);
     } finally {
-      console.log('[DEBUG] Finally block executing.');
       setIsLoading(false);
     }
   };
@@ -129,6 +133,8 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
         if (!isOpen) {
           setFullName('');
           setEmail('');
+          setIdPhoto(null);
+          setError(null);
           setIsLoading(false);
         }
       }}
@@ -174,6 +180,27 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
                 required
               />
             </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="idPhoto" className="text-right">
+                ID Photo
+              </Label>
+              <Input
+                id="idPhoto"
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  if (e.target.files) setIdPhoto(e.target.files[0]);
+                }}
+                className="col-span-3"
+                required
+              />
+            </div>
+             {error && (
+              <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
           </div>
           <DialogFooter>
             <Button type="submit" disabled={isLoading}>
@@ -232,6 +259,7 @@ function MembersList() {
             <TableHead>Name</TableHead>
             <TableHead>Client ID</TableHead>
             <TableHead>Joined Date</TableHead>
+            <TableHead>ID Photo</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -251,6 +279,9 @@ function MembersList() {
               </TableCell>
               <TableCell>
                 <Skeleton className="h-4 w-28" />
+              </TableCell>
+              <TableCell>
+                <Skeleton className="h-10 w-10" />
               </TableCell>
             </TableRow>
           ))}
@@ -274,6 +305,7 @@ function MembersList() {
           <TableHead>Name</TableHead>
           <TableHead>Client ID</TableHead>
           <TableHead>Joined Date</TableHead>
+          <TableHead>ID Photo</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -306,6 +338,19 @@ function MembersList() {
                     member.createdAt.seconds * 1000
                   ).toLocaleDateString()
                 : 'N/A'}
+            </TableCell>
+             <TableCell>
+              {member.idPhotoUrl && (
+                <a href={member.idPhotoUrl} target="_blank" rel="noopener noreferrer">
+                  <Image
+                    src={member.idPhotoUrl}
+                    alt={`${member.name} ID photo`}
+                    width={40}
+                    height={40}
+                    className="rounded-md object-cover"
+                  />
+                </a>
+              )}
             </TableCell>
           </TableRow>
         ))}
@@ -345,3 +390,5 @@ export default function MembersPage() {
     </>
   );
 }
+
+    
