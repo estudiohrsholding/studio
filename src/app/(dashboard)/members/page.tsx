@@ -45,7 +45,8 @@ import {
   onSnapshot,
   doc,
   writeBatch,
-  updateDoc
+  updateDoc,
+  Timestamp,
 } from 'firebase/firestore';
 import {
   getStorage,
@@ -60,6 +61,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { getMemberStatusTag } from '@/lib/utils/memberStatus';
 
 interface Member {
   id: string;
@@ -71,6 +73,8 @@ interface Member {
   } | null;
   avatar: string;
   idPhotoUrl: string;
+  membershipExpiresAt?: Timestamp | null;
+  isVetoed?: boolean;
 }
 
 function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
@@ -176,6 +180,8 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
         clubId: clubId,
         createdAt: serverTimestamp(),
         avatar: `https://picsum.photos/seed/${uuidv4()}/200/200`,
+        isVetoed: false,
+        membershipExpiresAt: null,
       };
   
       const db = getFirestore();
@@ -546,6 +552,7 @@ export default function MembersPage() {
                     <TableHeader>
                     <TableRow>
                         <TableHead>Name</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead>Client ID</TableHead>
                         <TableHead>Joined Date</TableHead>
                         <TableHead>ID Photo</TableHead>
@@ -562,6 +569,9 @@ export default function MembersPage() {
                                 <Skeleton className="h-3 w-40" />
                             </div>
                             </div>
+                        </TableCell>
+                        <TableCell>
+                            <Skeleton className="h-6 w-20 rounded-full" />
                         </TableCell>
                         <TableCell>
                             <Skeleton className="h-6 w-24" />
@@ -594,13 +604,16 @@ export default function MembersPage() {
                             )}
                         </TableHead>
                         <TableHead>Name</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead>Client ID</TableHead>
                         <TableHead>Joined Date</TableHead>
                         <TableHead>ID Photo</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
-                    {members.map((member) => (
+                    {members.map((member) => {
+                      const status = getMemberStatusTag(member.membershipExpiresAt || null, member.isVetoed || false);
+                      return (
                         <TableRow key={member.id} data-state={selectedMembers.has(member.id) && "selected"}>
                         <TableCell>
                           {isSelectionMode && (
@@ -630,6 +643,9 @@ export default function MembersPage() {
                             </div>
                         </TableCell>
                         <TableCell>
+                            <Badge variant="secondary" className={`${status.colorClass} text-white`}>{status.statusText}</Badge>
+                        </TableCell>
+                        <TableCell>
                             <Badge variant="outline">{member.id}</Badge>
                         </TableCell>
                         <TableCell>
@@ -653,7 +669,8 @@ export default function MembersPage() {
                             )}
                         </TableCell>
                         </TableRow>
-                    ))}
+                      )
+                    })}
                     </TableBody>
                 </Table>
             )}
@@ -717,5 +734,3 @@ export default function MembersPage() {
     </>
   );
 }
-
-    

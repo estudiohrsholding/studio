@@ -1,3 +1,4 @@
+import { Timestamp } from "firebase/firestore";
 
 export type User = {
   id: string;
@@ -17,6 +18,9 @@ export type Member = {
   email: string;
   avatar: string;
   idPhotoUrl: string;
+  membershipExpiresAt?: Timestamp | null;
+  isVetoed?: boolean;
+  createdAt?: Timestamp;
 };
 
 export type Item = {
