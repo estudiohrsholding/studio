@@ -191,7 +191,6 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
       name: name,
       group: group,
       category: category,
-      minimumUnitOfSale: Number(minSaleUnit) || 1,
       amountPerUnit: Number(price),
       createdAt: serverTimestamp(),
       clubId: clubId,
@@ -202,6 +201,7 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
         ...newItemData,
         isMembership: true,
         duration: membershipTimeUnit,
+        minimumUnitOfSale: 1, // Memberships are sold as single units
         stockLevel: undefined, // Explicitly ensure stockLevel is not written
       };
     } else {
@@ -209,6 +209,7 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
         ...newItemData,
         isMembership: false,
         stockLevel: Number(stock),
+        minimumUnitOfSale: Number(minSaleUnit) || 1,
         duration: undefined, // Explicitly ensure duration is not written
       };
     }
@@ -218,6 +219,7 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
       const inventoryColRef = collection(db, 'clubs', clubId, 'inventoryItems');
       await addDoc(inventoryColRef, newItemData);
       onAddItem();
+      resetForm();
     } catch (error: any) {
       console.error('Failed to add item:', error.message);
     } finally {
@@ -297,6 +299,7 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
     const [minSaleUnit, setMinSaleUnit] = useState('');
     const [price, setPrice] = useState('');
     const [duration, setDuration] = useState('');
+    const [stock, setStock] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const clubId = useAuthStore((state) => state.clubId);
 
@@ -311,8 +314,10 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
             if (item.isMembership) {
                 setDuration(item.duration || '');
                 setMinSaleUnit('');
+                setStock('');
             } else {
                 setMinSaleUnit(String(item.minimumUnitOfSale || ''));
+                setStock(String(item.stockLevel || ''));
                 setDuration('');
             }
         }
@@ -337,8 +342,10 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
             updatedData.stockLevel = undefined; // Ensure stockLevel is removed
         } else {
             updatedData.minimumUnitOfSale = Number(minSaleUnit);
+            // We don't update stockLevel here on purpose. It's handled by Refill.
+            // But if you needed to edit it here, you'd add:
+            // updatedData.stockLevel = Number(stock);
             updatedData.duration = undefined; // Ensure duration is removed
-            // Note: We don't update stockLevel here as it's handled by RefillDialog
         }
 
         try {
@@ -384,10 +391,13 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
                                 <Input id="edit-duration" value={duration} onChange={(e) => setDuration(e.target.value)} className="col-span-3" required />
                             </div>
                         ) : (
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="edit-min-unit" className="text-right">Min. Sale Unit</Label>
-                                <Input id="edit-min-unit" type="number" step="0.1" value={minSaleUnit} onChange={(e) => setMinSaleUnit(e.target.value)} className="col-span-3" />
-                            </div>
+                            <>
+                                <div className="grid grid-cols-4 items-center gap-4">
+                                    <Label htmlFor="edit-min-unit" className="text-right">Min. Sale Unit</Label>
+                                    <Input id="edit-min-unit" type="number" step="0.1" value={minSaleUnit} onChange={(e) => setMinSaleUnit(e.target.value)} className="col-span-3" />
+                                </div>
+                                {/* We don't include stock level in the edit form by design */}
+                            </>
                         )}
                     </div>
                     <DialogFooter>
