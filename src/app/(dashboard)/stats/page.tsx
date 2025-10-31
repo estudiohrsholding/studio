@@ -1,3 +1,5 @@
+'use client';
+
 import { DashboardHeader } from '@/components/dashboard/header';
 import { PageWrapper } from '@/components/dashboard/page-wrapper';
 import { DailySalesChart } from '@/components/dashboard/stats/daily-sales-chart';
