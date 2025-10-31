@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Club": {
@@ -95,7 +96,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "InventoryItem",
       "type": "object",
-      "description": "Represents an item in the club's inventory.",
+      "description": "Represents an item in the club's inventory. Can be a standard item with stock or a time-based membership.",
       "properties": {
         "itemId": {
           "type": "string",
@@ -111,7 +112,7 @@
         },
         "group": {
           "type": "string",
-          "description": "Group the item belongs to."
+          "description": "Group the item belongs to (e.g., Flowers, Edibles, Membresías)."
         },
         "category": {
           "type": "string",
@@ -119,7 +120,7 @@
         },
         "minimumUnitOfSale": {
           "type": "number",
-          "description": "Minimum unit of sale for the item."
+          "description": "Minimum unit of sale for the item. Not applicable for memberships."
         },
         "amountPerUnit": {
           "type": "number",
@@ -127,7 +128,15 @@
         },
         "stockLevel": {
           "type": "number",
-          "description": "Current stock level of the item."
+          "description": "Current stock level of the item. Not applicable for memberships."
+        },
+        "isMembership": {
+          "type": "boolean",
+          "description": "Flag to indicate if the item is a time-based membership."
+        },
+        "duration": {
+          "type": "string",
+          "description": "Duration of the membership (e.g., '30 days', '1 year'). Only applicable if isMembership is true."
         }
       },
       "required": [
@@ -136,9 +145,7 @@
         "name",
         "group",
         "category",
-        "minimumUnitOfSale",
-        "amountPerUnit",
-        "stockLevel"
+        "amountPerUnit"
       ]
     },
     "Transaction": {

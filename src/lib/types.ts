@@ -29,6 +29,8 @@ export type Item = {
   stockLevel: number;
   imageUrl?: string;
   imageHint?: string;
+  isMembership?: boolean;
+  duration?: string;
 };
 
 export type Transaction = {

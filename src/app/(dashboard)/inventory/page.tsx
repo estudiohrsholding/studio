@@ -115,7 +115,7 @@ function RefillDialog({ item }: { item: Item }) {
         }
     }}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
+        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!!item.isMembership}>
           <Plus className="h-4 w-4" />
           <span className="sr-only">Refill</span>
         </Button>
@@ -160,8 +160,22 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
   const [minSaleUnit, setMinSaleUnit] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
+  const [membershipTimeUnit, setMembershipTimeUnit] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { firestore } = useFirebase();
+
+  const isMembershipGroup = group.trim().toLowerCase() === 'membresías';
+
+  const resetForm = () => {
+    setName('');
+    setGroup('');
+    setCategory('');
+    setMinSaleUnit('');
+    setPrice('');
+    setStock('');
+    setMembershipTimeUnit('');
+    setIsLoading(false);
+  };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -173,16 +187,30 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
       return;
     }
 
-    const newItemData = {
+    let newItemData: any = {
       name: name,
       group: group,
       category: category,
-      minimumUnitOfSale: Number(minSaleUnit),
+      minimumUnitOfSale: Number(minSaleUnit) || 1,
       amountPerUnit: Number(price),
-      stockLevel: Number(stock),
       createdAt: serverTimestamp(),
       clubId: clubId,
     };
+    
+    if (isMembershipGroup) {
+      newItemData = {
+        ...newItemData,
+        isMembership: true,
+        duration: membershipTimeUnit,
+        stockLevel: 0, // Memberships don't have stock
+      };
+    } else {
+      newItemData = {
+        ...newItemData,
+        isMembership: false,
+        stockLevel: Number(stock),
+      };
+    }
 
     try {
       const db = getFirestore();
@@ -199,13 +227,7 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
   return (
     <Dialog onOpenChange={(isOpen) => {
         if (!isOpen) {
-            setName('');
-            setGroup('');
-            setCategory('');
-            setMinSaleUnit('');
-            setPrice('');
-            setStock('');
-            setIsLoading(false);
+            resetForm();
         }
     }}>
       <DialogTrigger asChild>
@@ -229,7 +251,7 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="group" className="text-right">Group</Label>
-              <Input id="group" value={group} onChange={(e) => setGroup(e.target.value)} className="col-span-3" required />
+              <Input id="group" value={group} onChange={(e) => setGroup(e.target.value)} className="col-span-3" placeholder="e.g., Flowers, Edibles, Membresías" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="category" className="text-right">Category</Label>
@@ -237,16 +259,23 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="min-unit" className="text-right">Min. Sale Unit</Label>
-              <Input id="min-unit" type="number" step="0.1" value={minSaleUnit} onChange={(e) => setMinSaleUnit(e.target.value)} className="col-span-3" required />
+              <Input id="min-unit" type="number" step="0.1" value={minSaleUnit} onChange={(e) => setMinSaleUnit(e.target.value)} className="col-span-3" required={!isMembershipGroup} />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="price" className="text-right">Price (€)</Label>
               <Input id="price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="col-span-3" required />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="stock" className="text-right">Initial Stock</Label>
-              <Input id="stock" type="number" value={stock} onChange={(e) => setStock(e.target.value)} className="col-span-3" required />
-            </div>
+            {isMembershipGroup ? (
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="duration" className="text-right">Duration</Label>
+                <Input id="duration" value={membershipTimeUnit} onChange={(e) => setMembershipTimeUnit(e.target.value)} placeholder="e.g., 30 days, 1 year" className="col-span-3" required />
+              </div>
+            ) : (
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="stock" className="text-right">Initial Stock</Label>
+                <Input id="stock" type="number" value={stock} onChange={(e) => setStock(e.target.value)} className="col-span-3" required />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="submit" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Item'}</Button>
@@ -256,6 +285,7 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
     </Dialog>
   );
 }
+
 
 function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, onUpdate: () => void, onOpenChange: (open: boolean) => void }) {
     const [name, setName] = useState('');
@@ -305,7 +335,7 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
         <Dialog open={!!item} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Edit Item</DialogTitle>
+                    <DialogTitle className='font-headline'>Edit Item</DialogTitle>
                     <DialogDescription>Update the details for {item?.name}.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit}>
@@ -496,7 +526,7 @@ export default function InventoryPage() {
                                         <TableHead>Item</TableHead>
                                         <TableHead>Category</TableHead>
                                         <TableHead>Price</TableHead>
-                                        <TableHead>Stock</TableHead>
+                                        <TableHead>Stock/Duration</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -547,7 +577,7 @@ export default function InventoryPage() {
                                         <TableHead>Item</TableHead>
                                         <TableHead>Category</TableHead>
                                         <TableHead>Price</TableHead>
-                                        <TableHead>Stock</TableHead>
+                                        <TableHead>Stock/Duration</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -582,9 +612,13 @@ export default function InventoryPage() {
                                             <TableCell><Badge variant="secondary">{item.category}</Badge></TableCell>
                                             <TableCell>€{(item.amountPerUnit || 0).toFixed(2)}</TableCell>
                                             <TableCell>
-                                                <span className={item.stockLevel < 15 ? 'text-destructive font-medium' : ''}>
-                                                    {item.stockLevel}
-                                                </span>
+                                                {item.isMembership ? (
+                                                    <span className="font-medium">{item.duration}</span>
+                                                ) : (
+                                                    <span className={item.stockLevel < 15 ? 'text-destructive font-medium' : ''}>
+                                                        {item.stockLevel}
+                                                    </span>
+                                                )}
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <RefillDialog item={item} />
@@ -657,5 +691,3 @@ export default function InventoryPage() {
     </>
   );
 }
-
-    
