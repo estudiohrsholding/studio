@@ -10,13 +10,6 @@ import {
   CardDescription,
   CardFooter,
 } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -31,7 +24,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/store/authStore';
 import {
   getFirestore,
@@ -41,16 +33,11 @@ import {
   orderBy,
   limit,
   where,
-  updateDoc,
   writeBatch,
   doc,
-  addDoc,
   serverTimestamp,
-  increment,
 } from 'firebase/firestore';
-import { useFirebase } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Command,
   CommandEmpty,
@@ -81,7 +68,8 @@ export default function POSPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState<string>('1');
+  const [amount, setAmount] = useState<string>('');
   const [isConfirming, setIsConfirming] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const clubId = useAuthStore((state) => state.clubId);
@@ -158,34 +146,64 @@ export default function POSPage() {
     return () => unsubscribe();
   }, [clubId, itemSearchTerm, db]);
 
-  const handleAddToCart = () => {
-    if (!selectedItem || quantity <= 0) return;
+  const handleQuantityChange = (newQuantity: string) => {
+    setQuantity(newQuantity);
+    if (!selectedItem || !selectedItem.amountPerUnit) return;
 
+    const q = parseFloat(newQuantity);
+    if (isNaN(q)) {
+      setAmount('');
+      return;
+    }
+    const newAmount = q * selectedItem.amountPerUnit;
+    setAmount(newAmount.toFixed(2));
+  };
+  
+  const handleAmountChange = (newAmount: string) => {
+    setAmount(newAmount);
+    if (!selectedItem || !selectedItem.amountPerUnit || selectedItem.amountPerUnit === 0) return;
+
+    const a = parseFloat(newAmount);
+    if (isNaN(a)) {
+      setQuantity('');
+      return;
+    }
+    const newQuantity = a / selectedItem.amountPerUnit;
+    setQuantity(newQuantity.toFixed(2));
+  };
+
+  const handleAddToCart = () => {
+    const numericQuantity = parseFloat(quantity);
+    if (!selectedItem || isNaN(numericQuantity) || numericQuantity <= 0) return;
+  
     setCart((prevCart) => {
       const existingItem = prevCart.find((item) => item.id === selectedItem.id);
       if (existingItem) {
         return prevCart.map((item) =>
           item.id === selectedItem.id
-            ? { ...item, quantity: item.quantity + quantity }
+            ? { ...item, quantity: item.quantity + numericQuantity }
             : item
         );
       }
-      return [...prevCart, { ...selectedItem, quantity }];
+      return [...prevCart, { ...selectedItem, quantity: numericQuantity }];
     });
-
+  
     setSelectedItem(null);
-    setQuantity(1);
+    setQuantity('1');
+    setAmount('');
     setItemSearchTerm('');
   };
 
   const handleRemoveFromCart = (itemId: string) => {
     setCart((prevCart) => prevCart.filter((item) => item.id !== itemId));
   };
-  
-  const total = useMemo(() => {
-    return cart.reduce((acc, item) => acc + (item.amountPerUnit || 0) * item.quantity, 0);
-  }, [cart]);
 
+  const total = useMemo(() => {
+    return cart.reduce(
+      (acc, item) => acc + (item.amountPerUnit || 0) * item.quantity,
+      0
+    );
+  }, [cart]);
 
   return (
     <>
@@ -215,7 +233,9 @@ export default function POSPage() {
                         aria-expanded={memberSelectOpen}
                         className="w-full justify-between"
                       >
-                        {selectedMember ? selectedMember.name : 'Select member...'}
+                        {selectedMember
+                          ? selectedMember.name
+                          : 'Select member...'}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
@@ -254,8 +274,8 @@ export default function POSPage() {
 
                 <div className="space-y-2">
                   <Label>Add Item</Label>
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-6">
+                    <div className="sm:col-span-3">
                       <Label htmlFor="item" className="sr-only">
                         Item
                       </Label>
@@ -264,45 +284,54 @@ export default function POSPage() {
                         onOpenChange={setItemSelectOpen}
                       >
                         <PopoverTrigger asChild>
-                           <Button
+                          <Button
                             variant="outline"
                             role="combobox"
                             aria-expanded={itemSelectOpen}
                             className="w-full justify-between"
                           >
-                             {selectedItem ? selectedItem.name : 'Select item...'}
+                            {selectedItem
+                              ? selectedItem.name
+                              : 'Select item...'}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
-                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                           <Command>
                             <CommandInput
-                                placeholder="Search item..."
-                                value={itemSearchTerm}
-                                onValueChange={setItemSearchTerm}
+                              placeholder="Search item..."
+                              value={itemSearchTerm}
+                              onValueChange={setItemSearchTerm}
                             />
                             <CommandList>
-                               {itemsLoading && <div className='p-2'><Skeleton className='h-8 w-full' /></div>}
-                               <CommandEmpty>No item found.</CommandEmpty>
-                               <CommandGroup>
-                                 {itemResults.map((item) => (
-                                    <CommandItem
-                                        key={item.id}
-                                        onSelect={() => {
-                                            setSelectedItem(item);
-                                            setItemSelectOpen(false);
-                                        }}
-                                    >
-                                        {item.name} (€{(item.amountPerUnit || 0).toFixed(2)})
-                                    </CommandItem>
-                                 ))}
-                               </CommandGroup>
+                              {itemsLoading && (
+                                <div className="p-2">
+                                  <Skeleton className="h-8 w-full" />
+                                </div>
+                              )}
+                              <CommandEmpty>No item found.</CommandEmpty>
+                              <CommandGroup>
+                                {itemResults.map((item) => (
+                                  <CommandItem
+                                    key={item.id}
+                                    onSelect={() => {
+                                      setSelectedItem(item);
+                                      setQuantity('1');
+                                      handleQuantityChange('1');
+                                      setItemSelectOpen(false);
+                                    }}
+                                  >
+                                    {item.name} (€
+                                    {(item.amountPerUnit || 0).toFixed(2)})
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
                             </CommandList>
                           </Command>
                         </PopoverContent>
                       </Popover>
                     </div>
-                    <div>
+                    <div className="sm:col-span-1">
                       <Label htmlFor="quantity" className="sr-only">
                         Quantity
                       </Label>
@@ -310,13 +339,25 @@ export default function POSPage() {
                         id="quantity"
                         type="number"
                         placeholder="Qty"
-                        className="w-20"
                         value={quantity}
-                        onChange={(e) => setQuantity(Number(e.target.value))}
-                        min="1"
+                        onChange={(e) => handleQuantityChange(e.target.value)}
+                        min="0"
                       />
                     </div>
-                    <Button variant="outline" size="icon" onClick={handleAddToCart}>
+                    <div className="sm:col-span-1">
+                      <Label htmlFor="amount" className="sr-only">
+                        Amount (€)
+                      </Label>
+                      <Input
+                        id="amount"
+                        type="number"
+                        placeholder="€"
+                        value={amount}
+                        onChange={(e) => handleAmountChange(e.target.value)}
+                        min="0"
+                      />
+                    </div>
+                    <Button variant="outline" size="icon" onClick={handleAddToCart} className="sm:col-span-1">
                       <PlusCircle className="h-4 w-4" />
                     </Button>
                   </div>
@@ -331,9 +372,14 @@ export default function POSPage() {
               <CardHeader>
                 <CardTitle className="font-headline">Shopping Cart</CardTitle>
                 {selectedMember ? (
-                   <CardDescription>Dispensing to: <span className='font-medium text-primary'>{selectedMember.name}</span></CardDescription>
+                  <CardDescription>
+                    Dispensing to:{' '}
+                    <span className="font-medium text-primary">
+                      {selectedMember.name}
+                    </span>
+                  </CardDescription>
                 ) : (
-                    <CardDescription>Select a member to begin.</CardDescription>
+                  <CardDescription>Select a member to begin.</CardDescription>
                 )}
               </CardHeader>
               <CardContent className="flex-1 space-y-4 overflow-y-auto">
@@ -350,12 +396,16 @@ export default function POSPage() {
                       <div>
                         <p className="font-medium">{item.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          {item.quantity} x €{(item.amountPerUnit || 0).toFixed(2)}
+                          {item.quantity} x €
+                          {(item.amountPerUnit || 0).toFixed(2)}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
                         <p className="font-medium">
-                          €{((item.amountPerUnit || 0) * item.quantity).toFixed(2)}
+                          €
+                          {((item.amountPerUnit || 0) * item.quantity).toFixed(
+                            2
+                          )}
                         </p>
                         <Button
                           variant="ghost"
@@ -376,11 +426,16 @@ export default function POSPage() {
                   <span>Total</span>
                   <span>€{total.toFixed(2)}</span>
                 </div>
-                <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
+                <Dialog
+                  open={showConfirmation}
+                  onOpenChange={setShowConfirmation}
+                >
                   <DialogTrigger asChild>
                     <Button
                       className="mt-4 w-full"
-                      disabled={cart.length === 0 || !selectedMember || isConfirming}
+                      disabled={
+                        cart.length === 0 || !selectedMember || isConfirming
+                      }
                     >
                       {isConfirming ? 'Processing...' : 'Confirm Dispense'}
                     </Button>
@@ -392,7 +447,10 @@ export default function POSPage() {
                       </DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
-                      <p>The following items have been dispensed to <span className='font-bold'>{selectedMember?.name}</span>:</p>
+                      <p>
+                        The following items have been dispensed to{' '}
+                        <span className="font-bold">{selectedMember?.name}</span>:
+                      </p>
                       <div className="space-y-2 rounded-md border p-4">
                         {cart.map((item) => (
                           <div
