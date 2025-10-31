@@ -43,68 +43,88 @@ import {
   onSnapshot,
   orderBy,
   doc,
-  updateDoc,
+  writeBatch,
   increment,
 } from 'firebase/firestore';
 import { useAuthStore } from '@/store/authStore';
 import { useFirebase } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Item } from '@/lib/types';
+import { mockUser } from '@/lib/data'; // Assuming mockUser might be needed for user name
 
 function RefillDialog({ item }: { item: Item }) {
   const [isOpen, setIsOpen] = useState(false);
   const [amountToAdd, setAmountToAdd] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const clubId = useAuthStore((state) => state.clubId);
 
   const handleRefill = async (event: FormEvent) => {
     event.preventDefault();
     console.log('%c[DEBUG REFILL] 1. handleRefill: Triggered.', 'color: #00FF00');
-
+  
     const refillAmount = Number(amountToAdd);
     console.log('[DEBUG REFILL] 2. Refill Amount:', refillAmount);
     console.log('[DEBUG REFILL] 3. Item ID:', item.id);
-
+  
     setIsLoading(true);
-
+  
     if (refillAmount <= 0) {
       console.error('%c[DEBUG REFILL] 4. FAILURE: Refill amount must be greater than 0.', 'color: #FF0000');
       // Here you would typically show a toast or an inline error to the user
       setIsLoading(false);
       return;
     }
-
-    const clubId = useAuthStore.getState().clubId;
+  
     console.log('%c[DEBUG REFILL] 5. clubId:', 'color: #FFA500', clubId);
-
+  
     if (!clubId || !item.id) {
       console.error('%c[DEBUG REFILL] 6. FAILURE: clubId or itemId is null.', 'color: #FF0000');
       setIsLoading(false);
       return;
     }
-
+  
     try {
       const db = getFirestore();
+      // --- Create the Batch ---
+      const batch = writeBatch(db);
+  
+      // --- Operation 1 (Update Inventory) ---
       const itemDocRef = doc(db, 'clubs', clubId, 'inventoryItems', item.id);
-      console.log('%c[DEBUG REFILL] 7. Firestore Path:', 'color: #00FFFF', itemDocRef.path);
-      
-      console.log('[DEBUG REFILL] 8. Attempting atomic updateDoc() with increment()...');
-      await updateDoc(itemDocRef, {
-        stockLevel: increment(refillAmount) 
-      });
-      console.log('%c[DEBUG REFILL] 9. SUCCESS: updateDoc() completed.', 'color: #00FF00');
-      
-      console.log('[DEBUG REFILL] 10. Attempting onClose()...');
+      console.log('%c[DEBUG REFILL] 7. Firestore Path (Inventory):', 'color: #00FFFF', itemDocRef.path);
+      batch.update(itemDocRef, { stockLevel: increment(refillAmount) });
+  
+      // --- Operation 2 (Create Log) ---
+      const logDocRef = doc(collection(db, 'clubs', clubId, 'transactions'));
+      console.log('%c[DEBUG REFILL] 8. Firestore Path (Transaction Log):', 'color: #00FFFF', logDocRef.path);
+      const logData = { 
+        type: 'refill', 
+        transactionDate: serverTimestamp(), 
+        itemId: item.id, 
+        itemName: item.name, 
+        quantity: refillAmount,
+        user: mockUser.name, // In a real app, this would come from the auth state
+        clubId: clubId
+      };
+      batch.set(logDocRef, logData);
+  
+      // --- Commit the Batch ---
+      console.log('[DEBUG REFILL] 9. Attempting atomic batch.commit()...');
+      await batch.commit();
+      console.log('%c[DEBUG REFILL] 10. SUCCESS: batch.commit() completed.', 'color: #00FF00');
+  
+      console.log('[DEBUG REFILL] 11. Attempting onClose()...');
       setIsOpen(false); // Close the modal on success
-      console.log('%c[DEBUG REFILL] 11. SUCCESS: onClose() called.', 'color: #00FF00');
-
+      console.log('%c[DEBUG REFILL] 12. SUCCESS: onClose() called.', 'color: #00FF00');
+  
     } catch (error: any) {
-      console.error('%c[DEBUG REFILL] 12. CRITICAL FAILURE in try block:', 'color: #FF0000', error.message);
+      console.error('%c[DEBUG REFILL] 13. CRITICAL FAILURE in try block:', 'color: #FF0000', error.message);
       console.error(error);
     } finally {
-      console.log('[DEBUG REFILL] 13. Finally block executed.');
+      console.log('[DEBUG REFILL] 14. Finally block executed.');
       setIsLoading(false);
     }
   };
+  
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
@@ -265,7 +285,7 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="min-unit" className="text-right">Min. Sale Unit</Label>
-              <Input id="min-unit" value={minSaleUnit} onChange={(e) => setMinSaleUnit(e.target.value)} className="col-span-3" required />
+              <Input id="min-unit" type="number" step="0.1" value={minSaleUnit} onChange={(e) => setMinSaleUnit(e.target.value)} className="col-span-3" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="price" className="text-right">Price (€)</Label>
@@ -428,3 +448,5 @@ export default function InventoryPage() {
     </>
   );
 }
+
+    
