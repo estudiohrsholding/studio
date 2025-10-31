@@ -78,7 +78,7 @@ function LoginPageContent() {
         <div className="mb-8 flex flex-col items-center">
           <Logo className="h-12 w-12 text-primary" />
           <h1 className="mt-4 font-headline text-3xl font-bold tracking-tight">
-            ClubConnect
+            <span className="text-primary">Cannabi</span><span className="text-accent">App</span>
           </h1>
           <p className="text-muted-foreground">
             The central hub for your club.
@@ -153,7 +153,7 @@ function LoginPageSkeleton() {
         <div className="mb-8 flex flex-col items-center">
           <Logo className="h-12 w-12 text-primary" />
           <h1 className="mt-4 font-headline text-3xl font-bold tracking-tight">
-            ClubConnect
+            <span className="text-primary">Cannabi</span><span className="text-accent">App</span>
           </h1>
           <p className="text-muted-foreground">
             The central hub for your club.

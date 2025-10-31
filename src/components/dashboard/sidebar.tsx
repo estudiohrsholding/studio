@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -49,7 +50,7 @@ export function DashboardSidebar({ children }: { children: React.ReactNode }) {
           >
             <Logo className="size-8 text-primary" />
             <span className="font-headline text-lg font-semibold group-data-[collapsible=icon]:hidden">
-              ClubConnect
+              CannabiApp
             </span>
           </Link>
         </SidebarHeader>

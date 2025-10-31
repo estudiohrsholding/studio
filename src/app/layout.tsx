@@ -4,7 +4,7 @@ import './globals.css';
 import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
-  title: 'ClubConnect',
+  title: 'CannabiApp',
   description: 'Manage your club with ease.',
 };
 
