@@ -305,77 +305,90 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
   );
 }
 
+function groupItemsByField(items: Item[], field: keyof Item): Record<string, Item[]> {
+    return items.reduce((acc, item) => {
+        const key = item[field] as string;
+        if (!acc[key]) {
+            acc[key] = [];
+        }
+        acc[key].push(item);
+        return acc;
+    }, {} as Record<string, Item[]>);
+}
+
 function InventoryList() {
-    const [items, setItems] = useState<Item[]>([]);
+    const [groupedItems, setGroupedItems] = useState<Record<string, Item[]>>({});
     const [isLoading, setIsLoading] = useState(true);
     const clubId = useAuthStore((state) => state.clubId);
     
     useEffect(() => {
       if (!clubId) {
-        console.log('%c[DEBUG LIST] Listener not attached (no clubId).', 'color: #800080');
-        setItems([]);
+        setGroupedItems({});
         setIsLoading(false);
         return;
       }
     
-      console.log('%c[DEBUG LIST] 1. New render, attaching snapshot listener...', 'color: #800080');
       const db = getFirestore();
       const itemsQuery = query(collection(db, 'clubs', clubId, 'inventoryItems'), orderBy('createdAt', 'desc'));
     
       const unsubscribe = onSnapshot(itemsQuery, (snapshot) => {
-        console.log('%c[DEBUG LIST] 2. Snapshot fired! Found documents:', 'color: #800080', snapshot.size);
         const itemsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Item));
-    
-        console.log('[DEBUG LIST] 3. New state being set:', itemsData); 
-        setItems(itemsData);
+        const grouped = groupItemsByField(itemsData, 'group');
+        setGroupedItems(grouped);
         setIsLoading(false);
       }, (error) => {
-        console.error('%c[DEBUG LIST] 4. Snapshot listener FAILED:', 'color: #FF0000', error);
+        console.error('Error fetching inventory:', error);
         setIsLoading(false);
       });
     
       return () => {
-        console.log('%c[DEBUG LIST] 5. Detaching listener.', 'color: #800080');
         unsubscribe();
       };
     }, [clubId]);
 
     if (isLoading) {
         return (
-             <Table>
-                <TableHeader>
-                    <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Stock</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {[...Array(3)].map((_, i) => (
-                        <TableRow key={i}>
-                            <TableCell>
-                               <div className="flex items-center gap-3">
-                                  <Skeleton className="h-10 w-10 rounded-md" />
-                                  <div className="space-y-1">
-                                    <Skeleton className="h-4 w-24" />
-                                    <Skeleton className="h-3 w-16" />
-                                  </div>
-                                </div>
-                            </TableCell>
-                            <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
-                            <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                            <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
-                        </TableRow>
-                    ))}
-                </TableBody>
-             </Table>
+             <div className="space-y-6">
+                {[...Array(2)].map((_, groupIndex) => (
+                    <div key={groupIndex}>
+                        <Skeleton className="h-8 w-40 mb-4" />
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Item</TableHead>
+                                    <TableHead>Category</TableHead>
+                                    <TableHead>Price</TableHead>
+                                    <TableHead>Stock</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {[...Array(2)].map((_, itemIndex) => (
+                                    <TableRow key={itemIndex}>
+                                        <TableCell>
+                                        <div className="flex items-center gap-3">
+                                            <Skeleton className="h-10 w-10 rounded-md" />
+                                            <div className="space-y-1">
+                                                <Skeleton className="h-4 w-24" />
+                                                <Skeleton className="h-3 w-16" />
+                                            </div>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                                        <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                                        <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                ))}
+             </div>
         )
     }
 
-    if (items.length === 0) {
+    if (Object.keys(groupedItems).length === 0) {
         return (
             <div className="py-16 text-center text-muted-foreground">
                 No inventory items found. Add your first item!
@@ -384,49 +397,56 @@ function InventoryList() {
     }
 
     return (
-        <Table>
-            <TableHeader>
-                <TableRow>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Price</TableHead>
-                    <TableHead>Stock</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {items.map((item) => (
-                    <TableRow key={item.id}>
-                        <TableCell>
-                            <div className="flex items-center gap-3">
-                                <Image
-                                    src={item.imageUrl || `https://picsum.photos/seed/${item.id}/40/40`}
-                                    alt={item.name}
-                                    width={40}
-                                    height={40}
-                                    className="rounded-md object-cover"
-                                    data-ai-hint={item.imageHint || 'product package'}
-                                />
-                                <div>
-                                    <div className="font-medium">{item.name}</div>
-                                    <div className="text-sm text-muted-foreground">{item.group}</div>
-                                </div>
-                            </div>
-                        </TableCell>
-                        <TableCell><Badge variant="secondary">{item.category}</Badge></TableCell>
-                        <TableCell>€{(item.amountPerUnit || 0).toFixed(2)}</TableCell>
-                        <TableCell>
-                            <span className={item.stockLevel < 15 ? 'text-destructive font-medium' : ''}>
-                                {item.stockLevel}
-                            </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                            <RefillDialog item={item} />
-                        </TableCell>
-                    </TableRow>
-                ))}
-            </TableBody>
-        </Table>
+        <div className="space-y-8">
+            {Object.entries(groupedItems).map(([groupName, itemsInGroup]) => (
+                <div key={groupName}>
+                    <h2 className="font-headline text-2xl font-semibold mb-4">{groupName}</h2>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Item</TableHead>
+                                <TableHead>Category</TableHead>
+                                <TableHead>Price</TableHead>
+                                <TableHead>Stock</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {itemsInGroup.map((item) => (
+                                <TableRow key={item.id}>
+                                    <TableCell>
+                                        <div className="flex items-center gap-3">
+                                            <Image
+                                                src={item.imageUrl || `https://picsum.photos/seed/${item.id}/40/40`}
+                                                alt={item.name}
+                                                width={40}
+                                                height={40}
+                                                className="rounded-md object-cover"
+                                                data-ai-hint={item.imageHint || 'product package'}
+                                            />
+                                            <div>
+                                                <div className="font-medium">{item.name}</div>
+                                                <div className="text-sm text-muted-foreground">{item.group}</div>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell><Badge variant="secondary">{item.category}</Badge></TableCell>
+                                    <TableCell>€{(item.amountPerUnit || 0).toFixed(2)}</TableCell>
+                                    <TableCell>
+                                        <span className={item.stockLevel < 15 ? 'text-destructive font-medium' : ''}>
+                                            {item.stockLevel}
+                                        </span>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <RefillDialog item={item} />
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
+            ))}
+        </div>
     );
 }
 
@@ -456,3 +476,5 @@ export default function InventoryPage() {
     </>
   );
 }
+
+    
