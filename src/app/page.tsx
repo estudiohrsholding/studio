@@ -5,7 +5,6 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import Link from 'next/link';
-import { useAuthStore } from '@/store/authStore';
 import { Logo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import {
