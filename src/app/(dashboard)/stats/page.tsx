@@ -58,8 +58,7 @@ export default function StatsPage() {
 
     const transactionsQuery = query(
       collection(getFirestore(), 'clubs', clubId, 'transactions'),
-      where('type', '==', 'dispense-log'),
-      where('transactionDate', '>=', sevenDaysAgo)
+      orderBy('transactionDate', 'desc')
     );
 
     const unsubscribe = onSnapshot(transactionsQuery, (snapshot) => {
@@ -74,11 +73,13 @@ export default function StatsPage() {
       
       snapshot.docs.forEach((doc) => {
         const log = doc.data() as TransactionLog;
-        if (log.transactionDate) {
+        if (log.transactionDate && log.type === 'dispense-log') {
           const saleDate = log.transactionDate.toDate();
-          const dayKey = format(saleDate, 'E');
-          if (dayKey in salesByDay) {
-            salesByDay[dayKey] += log.amount;
+          if (saleDate >= sevenDaysAgo) {
+            const dayKey = format(saleDate, 'E');
+            if (dayKey in salesByDay) {
+              salesByDay[dayKey] += log.amount;
+            }
           }
         }
       });
