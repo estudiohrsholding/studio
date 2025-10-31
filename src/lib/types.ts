@@ -14,7 +14,6 @@ export type Member = {
   clubId: string;
   name: string;
   email: string;
-  joinedDate: string;
   avatar: string;
 };
 
