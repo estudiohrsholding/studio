@@ -1,86 +1,78 @@
-import * as functions from 'firebase-functions';
+'use strict';
+
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as admin from 'firebase-admin';
-import { v4 as uuidv4 } from 'uuid';
+import { FieldValue } from 'firebase-admin/firestore';
 
 admin.initializeApp();
 
-const db = admin.firestore();
-
 /**
- * A callable Cloud Function to provision a new club and its administrator.
+ * A 2nd Gen onCall HTTPS Cloud Function to provision a new club and its administrator.
  *
  * This function performs the following actions atomically:
- * 1.  Validates that the caller is authenticated.
- * 2.  Creates a new 'Club' document in Firestore.
- * 3.  Creates a new 'UserAdmin' document in Firestore.
- * 4.  Sets custom claims on the calling user's Firebase Auth record,
- *     assigning them a 'clubId' and a 'role' of 'userAdmin'.
+ * 1. Validates that the caller has provided the necessary data (`adminUid`, `clubName`).
+ * 2. Creates a new 'clubs' document in Firestore with the club details.
+ * 3. Sets custom claims on the calling user's Firebase Auth record,
+ *    assigning them the new `clubId` and a `role` of 'admin'.
  *
- * @param data - The data passed to the function, expecting `clubName` and `adminUid`.
- * @param context - The context of the function call, containing auth information.
+ * @param request - The data passed to the function, expecting `adminUid` and `clubName`.
  * @returns A promise that resolves with the result of the operation.
  */
-export const provisionNewClub = functions.https.onCall(async (data, context) => {
-  const adminUid = context.auth?.uid;
-  const { clubName } = data;
-
-  if (!adminUid) {
-    throw new functions.https.HttpsError(
-      'unauthenticated',
-      'The function must be called while authenticated.'
-    );
-  }
-
-  if (typeof clubName !== 'string' || clubName.length === 0) {
-    throw new functions.https.HttpsError(
+export const provisionNewClub = onCall(async (request) => {
+  // 1. Input Validation
+  const { adminUid, clubName } = request.data;
+  if (!adminUid || !clubName) {
+    throw new HttpsError(
       'invalid-argument',
-      'The function must be called with a valid "clubName" string argument.'
+      'The function must be called with "adminUid" and "clubName" arguments.'
     );
   }
 
-  const clubId = uuidv4();
+  // If you are not using anonymous auth, you can also validate the caller's auth context
+  if (!request.auth) {
+     throw new HttpsError('unauthenticated', 'The function must be called by an authenticated user.');
+  }
 
-  const clubRef = db.collection('clubs').doc(clubId);
-  const userAdminRef = db.collection('userAdmins').doc(adminUid);
+  // It's a good practice to ensure the UID from the data matches the caller's UID
+  if (request.auth.uid !== adminUid) {
+      throw new HttpsError('permission-denied', 'You can only provision a club for your own account.');
+  }
+
+
+  const db = admin.firestore();
+  const auth = admin.auth();
 
   try {
-    // Use a batch to ensure atomicity
-    const batch = db.batch();
-
-    // 1. Create Club document
-    batch.set(clubRef, {
-      clubId: clubId,
+    // 2. Atomic Workflow
+    // Step A: Create the club document in the 'clubs' collection.
+    const clubDocRef = await db.collection('clubs').add({
       name: clubName,
       userAdminId: adminUid,
-      dateCreated: admin.firestore.FieldValue.serverTimestamp(),
+      dateCreated: FieldValue.serverTimestamp(),
     });
 
-    // 2. Create UserAdmin document
-    batch.set(userAdminRef, {
-      userAdminId: adminUid,
-      email: context.auth?.token.email || '',
-      clubIds: [clubId],
+    // Step B: Get the automatically generated ID from the new document.
+    const newClubId = clubDocRef.id;
+
+    // Step C (Critical): Set the custom claims on the user's Auth record.
+    // This securely associates the user with their club and role.
+    await auth.setCustomUserClaims(adminUid, {
+      clubId: newClubId,
+      role: 'userAdmin', // Using 'userAdmin' to match client-side expectations.
     });
 
-    // Commit the batch
-    await batch.commit();
+    // 3. Return Success
+    console.log(`Successfully provisioned club ${newClubId} for user ${adminUid}`);
+    return { status: 'success', clubId: newClubId };
 
-    // 3. Set custom claims on the user
-    await admin.auth().setCustomUserClaims(adminUid, {
-      clubId: clubId,
-      role: 'userAdmin',
-    });
-
-    return {
-      status: 'success',
-      message: 'Club provisioned successfully.',
-      clubId: clubId,
-    };
-  } catch (error) {
-    console.error('Error provisioning new club:', error);
-    throw new functions.https.HttpsError(
+  } catch (error: any) {
+    // 4. Error Handling
+    console.error('Club provisioning failed:', error);
+    // Throw a specific error for the client, but log the detailed one.
+    throw new HttpsError(
       'internal',
-      'An internal error occurred while provisioning the club.'
+      'An internal error occurred while provisioning the club.',
+      error.message
     );
   }
 });
