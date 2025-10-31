@@ -34,7 +34,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 interface LogEntry {
   id: string;
   type: 'dispense' | 'refill' | 'dispense-log';
-  transactionDate: Timestamp;
+  transactionDate: Timestamp | { seconds: number; nanoseconds: number };
   itemName: string;
   quantity: number;
   amount: number | null;
@@ -78,6 +78,19 @@ export default function HistoryPage() {
 
     return () => unsubscribe();
   }, [clubId]);
+  
+  const formatDate = (dateValue: any) => {
+    if (!dateValue) return 'N/A';
+    // If it's a Firebase Timestamp object from the client
+    if (typeof dateValue.toDate === 'function') {
+      return dateValue.toDate().toLocaleString();
+    }
+    // If it's a plain object from server-side rendering
+    if (dateValue.seconds) {
+      return new Date(dateValue.seconds * 1000).toLocaleString();
+    }
+    return 'Invalid Date';
+  }
 
   return (
     <>
@@ -155,9 +168,7 @@ export default function HistoryPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {entry.transactionDate && typeof entry.transactionDate.toDate === 'function'
-                          ? entry.transactionDate.toDate().toLocaleString()
-                          : 'N/A'}
+                        {formatDate(entry.transactionDate)}
                       </TableCell>
                       <TableCell className="text-right">
                         {entry.amount ? `€${entry.amount.toFixed(2)}` : '-'}

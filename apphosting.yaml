@@ -1,9 +1,10 @@
 # Settings to manage and configure a Firebase App Hosting backend.
 # https://firebase.google.com/docs/app-hosting/configure
 
+# Point to the root of the repository as the application's root directory.
+sourceDir: .
+
 runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
-# Point to the root of the repository as the application's root directory.
-sourceDir: .
