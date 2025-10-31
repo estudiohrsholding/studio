@@ -27,7 +27,6 @@ function LoginPageContent() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const setLoginData = useAuthStore((state) => state.setLoginData);
 
   useEffect(() => {
     const message = searchParams.get('message');
@@ -36,44 +35,41 @@ function LoginPageContent() {
     }
   }, [searchParams]);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    console.log('%c[DEBUG LOGIN] 1. handleSubmit: Triggered.', 'color: #00FF00');
     setIsLoading(true);
     setError(null);
-    setSuccessMessage(null);
 
     try {
       const auth = getAuth();
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-      const user = userCredential.user;
+      const setLoginData = useAuthStore.getState().setLoginData;
 
-      // CRITICAL: Force a token refresh to get the latest custom claims
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      console.log('%c[DEBUG LOGIN] 2. Auth: User authenticated:', 'color: #00FF00', user.uid);
+
+      console.log('[DEBUG LOGIN] 3. Claims: Forcing token refresh to get claims...');
       const idTokenResult = await user.getIdTokenResult(true);
       const { clubId, role } = idTokenResult.claims;
+      console.log('%c[DEBUG LOGIN] 4. Claims: Claims retrieved! clubId is:', 'color: #FFA500', clubId);
 
-      // CRITICAL: Validate that the tenant ID (clubId) exists in the claims
       if (!clubId) {
-        throw new Error(
-          'AUTH_ERR: No tenant (clubId) associated with this account.'
-        );
+        console.error('%c[DEBUG LOGIN] 5. FAILURE: No clubId found in claims!', 'color: #FF0000');
+        setError('This account is not associated with a club.');
+        setIsLoading(false);
+        return;
       }
 
-      // CRITICAL: Set the multi-tenant data in the global store
-      setLoginData({
-        uid: user.uid,
-        clubId: clubId as string,
-        role: (role as string) || 'guest',
-      });
+      console.log('[DEBUG LOGIN] 6. Zustand: Calling setLoginData...');
+      setLoginData({ uid: user.uid, clubId: clubId as string, role: role as string });
+      console.log('%c[DEBUG LOGIN] 7. Zustand: Global state updated!', 'color: #00FF00');
 
-      // Only redirect AFTER the global state is set
+      console.log('[DEBUG LOGIN] 8. Router: Redirecting to /home...');
       router.push('/home');
 
     } catch (err: any) {
-      setIsLoading(false);
+      console.error('%c[DEBUG LOGIN] CRITICAL FAILURE in try block:', 'color: #FF0000', err.message);
       let errorMessage = 'An unexpected error occurred. Please try again.';
       if (err.code) {
         switch (err.code) {
@@ -87,6 +83,8 @@ function LoginPageContent() {
         errorMessage = err.message;
       }
       setError(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 

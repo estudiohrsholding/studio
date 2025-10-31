@@ -13,65 +13,95 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isUserLoading } = useAuth();
-  const setLoginData = useAuthStore((state) => state.setLoginData);
-  const logout = useAuthStore((state) => state.logout);
-  const clubId = useAuthStore((state) => state.clubId);
+  const { user, isUserLoading: isAuthLoading } = useAuth(); // Renamed to avoid conflict
+  const { clubId, isLoading: isStoreLoading, setLoginData, logout, setLoading } = useAuthStore(state => ({
+    clubId: state.clubId,
+    isLoading: state.isLoading,
+    setLoginData: state.setLoginData,
+    logout: state.logout,
+    setLoading: state.setLoading,
+  }));
   const router = useRouter();
 
+  console.log('%c[DEBUG GUARDIAN] 10. Guardian executed! Reading state...', 'color: #FF00FF');
+  console.log('%c[DEBUG GUARDIAN] Current State: isAuthLoading:', 'color: #FF00FF', isAuthLoading);
+  console.log('%c[DEBUG GUARDIAN] Current State: isStoreLoading:', 'color: #FF00FF', isStoreLoading);
+  console.log('%c[DEBUG GUARDIAN] Current State: clubId:', 'color: #FF00FF', clubId);
+
   useEffect(() => {
-    if (isUserLoading) {
-      // Still checking for user, do nothing yet.
-      return;
+    if (isAuthLoading) {
+      console.log('[DEBUG GUARDIAN] useEffect: Auth state is loading...');
+      return; // Wait for Firebase Auth to initialize
     }
 
     if (!user) {
-      // No user found, clear state and redirect to login
+      console.error('[DEBUG GUARDIAN] useEffect: No user found, logging out and redirecting.');
       logout();
       router.push('/');
       return;
     }
 
-    // User is logged in, but we need to ensure their claims (clubId) are loaded.
-    user.getIdTokenResult(true).then((idTokenResult) => {
-      const { clubId, role } = idTokenResult.claims;
+    // If we have a user but no clubId in the store, fetch claims.
+    if (user && !clubId) {
+        console.log('[DEBUG GUARDIAN] useEffect: User exists, but no clubId in store. Fetching claims...');
+        setLoading(true);
+        user.getIdTokenResult(true).then((idTokenResult) => {
+            const { clubId, role } = idTokenResult.claims;
+            console.log('[DEBUG GUARDIAN] useEffect: Claims fetched! clubId:', clubId);
 
-      if (clubId && role) {
-        // We have the claims, set them in the global store.
-        setLoginData({
-          uid: user.uid,
-          clubId: clubId as string,
-          role: role as string,
+            if (clubId && role) {
+                setLoginData({
+                    uid: user.uid,
+                    clubId: clubId as string,
+                    role: role as string,
+                });
+            } else {
+                console.error('[DEBUG GUARDIAN] CRITICAL: User has no claims. Logging out.');
+                logout();
+                router.push('/?error=auth_error');
+            }
+            setLoading(false);
+        }).catch(error => {
+            console.error('[DEBUG GUARDIAN] Error fetching ID token:', error);
+            logout();
+            router.push('/');
+            setLoading(false);
         });
-      } else {
-        // User exists but has no claims. This is an invalid state.
-        console.error('CRITICAL: User is authenticated but has no clubId/role claims.');
-        logout();
-        router.push('/?error=auth_error'); // Redirect with an error
-      }
-    }).catch(error => {
-        console.error('Error fetching ID token:', error);
-        logout();
-        router.push('/');
-    });
+    } else if (user && clubId) {
+        // User and clubId are already in the store, we are good.
+        if (isStoreLoading) setLoading(false);
+    }
+  }, [user, isAuthLoading, clubId, router, setLoginData, logout, setLoading, isStoreLoading]);
 
-  }, [user, isUserLoading, router, setLoginData, logout]);
+  // Combined loading state
+  const isLoading = isAuthLoading || isStoreLoading;
 
-  // While user or claims are loading, show a loading shell.
-  if (isUserLoading || !clubId) {
+   if (isLoading) {
+    console.log('%c[DEBUG GUARDIAN] DECISION: isAuthLoading or isStoreLoading is true. Rendering loading skeleton.', 'color: #FFA500');
     return (
-        <div className="flex h-screen w-full items-center justify-center">
-            <div className="flex flex-col items-center gap-4">
-                <Skeleton className="h-12 w-12 rounded-full" />
-                <div className="space-y-2">
-                    <Skeleton className="h-4 w-[250px]" />
-                    <Skeleton className="h-4 w-[200px]" />
-                </div>
-            </div>
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Skeleton className="h-12 w-12 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-[250px]" />
+            <Skeleton className="h-4 w-[200px]" />
+          </div>
         </div>
+      </div>
     );
   }
 
-  // Once everything is loaded, render the actual dashboard.
+  if (!isLoading && !clubId) {
+    console.error('%c[DEBUG GUARDIAN] DECISION: Unauthenticated! Redirecting to /.', 'color: #FF0000');
+    // This state shouldn't be reached if useEffect logic is correct, but as a fallback.
+    // router.push('/'); // This can cause loops. The useEffect handles redirection.
+    return (
+        <div className="flex h-screen w-full items-center justify-center">
+             <p>Redirecting to login...</p>
+        </div>
+    );
+  }
+  
+  console.log('%c[DEBUG GUARDIAN] DECISION: Authenticated! Rendering children.', 'color: #00FF00');
   return <DashboardSidebar>{children}</DashboardSidebar>;
 }
