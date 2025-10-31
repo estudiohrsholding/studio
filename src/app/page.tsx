@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import Link from 'next/link';
 import { useAuthStore } from '@/store/authStore';
 import { Logo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
@@ -17,18 +18,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-export default function LoginPage() {
+function LoginPageContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const setLoginData = useAuthStore((state) => state.setLoginData);
+
+  useEffect(() => {
+    const message = searchParams.get('message');
+    if (message) {
+      setSuccessMessage(decodeURIComponent(message));
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoading(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
       const auth = getAuth();
@@ -93,7 +104,13 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            {successMessage && (
+              <Alert variant="default" className="mb-4 border-green-500 bg-green-50 text-green-800 dark:bg-green-950 dark:text-green-300 dark:border-green-700 [&>svg]:text-green-600">
+                <AlertTitle>Success!</AlertTitle>
+                <AlertDescription>{successMessage}</AlertDescription>
+              </Alert>
+            )}
+             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -129,7 +146,22 @@ export default function LoginPage() {
             </form>
           </CardContent>
         </Card>
+         <div className="mt-4 text-center text-sm">
+          Don't have an account?{' '}
+          <Link href="/register" className="underline hover:text-primary">
+            Register a new club
+          </Link>
+        </div>
       </div>
     </div>
   );
+}
+
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LoginPageContent />
+    </Suspense>
+  )
 }
