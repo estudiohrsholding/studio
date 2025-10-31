@@ -145,7 +145,11 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
     } catch (error: any) {
       console.error('%c[DEBUG] 14. CRITICAL FAILURE in try block:', 'color: #FF0000', error.code, error.message);
       console.error(error);
-      setError(`An unexpected error occurred: ${error.message}`);
+      if (error.code === 'storage/unauthorized' || error.code === 'storage/object-not-found' || error.message.includes('CORS')) {
+        setError("File upload failed. This is likely a cloud configuration issue. Please ensure Firebase Storage is enabled and CORS is configured correctly for your bucket.");
+      } else {
+        setError(`An unexpected error occurred: ${error.message}`);
+      }
     } finally {
       console.log('[DEBUG] 15. Finally block executed.');
       setIsLoading(false); // This MUST run to reset the button
