@@ -39,6 +39,12 @@ interface StockDistribution {
   fill: string;
 }
 
+// Predefined color palette for chart segments
+const chartColors = [
+    'var(--color-flowers)', 'var(--color-oils)', 'var(--color-edibles)', 
+    'var(--color-vapes)', 'var(--color-topicals)', 'var(--color-other)'
+];
+
 export default function StatsPage() {
   const clubId = useAuthStore((state) => state.clubId);
   
@@ -127,11 +133,7 @@ export default function StatsPage() {
             stockByCategory[category] += item.stockLevel;
         });
 
-        const chartColors = [
-            'var(--color-flowers)', 'var(--color-oils)', 'var(--color-edibles)', 
-            'var(--color-vapes)', 'var(--color-topicals)'
-        ];
-
+        // Assign colors from the predefined palette
         const stockData = Object.entries(stockByCategory).map(([category, stock], index) => ({
             category,
             stock,

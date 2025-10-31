@@ -24,11 +24,16 @@
     --input: 0 0% 89.8%;
     --ring: 45 74% 52%;
     --radius: 0.5rem;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    
+    /* Chart Colors */
+    --color-sales: hsl(var(--primary));
+    --color-flowers: hsl(12, 83%, 60%);   /* Vibrant Red/Orange */
+    --color-oils: hsl(173, 58%, 39%);    /* Deep Teal */
+    --color-edibles: hsl(96, 75%, 45%);  /* Lively Green */
+    --color-vapes: hsl(43, 90%, 60%);    /* Bright Yellow */
+    --color-topicals: hsl(260, 65%, 70%);/* Soft Purple */
+    --color-other: hsl(210, 15%, 70%);   /* Neutral Gray */
+
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -59,11 +64,16 @@
     --border: 210 4% 30%;
     --input: 210 4% 30%;
     --ring: 45 74% 52%;
-    --chart-1: 45 74% 52%;
-    --chart-2: 125 100% 52%;
-    --chart-3: 210 4% 60%;
-    --chart-4: 45 74% 70%;
-    --chart-5: 125 100% 70%;
+
+    /* Chart Colors */
+    --color-sales: hsl(var(--primary));
+    --color-flowers: hsl(12, 90%, 65%);   /* Vibrant Red/Orange */
+    --color-oils: hsl(173, 80%, 45%);    /* Deep Teal */
+    --color-edibles: hsl(96, 85%, 55%);  /* Lively Green */
+    --color-vapes: hsl(43, 95%, 65%);    /* Bright Yellow */
+    --color-topicals: hsl(260, 75%, 75%);/* Soft Purple */
+    --color-other: hsl(210, 10%, 75%);   /* Neutral Gray */
+
     --sidebar-background: 210 4% 16%;
     --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: 45 74% 52%;
