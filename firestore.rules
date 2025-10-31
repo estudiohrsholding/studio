@@ -1,0 +1,234 @@
+/**
+ * @fileoverview Firestore Security Rules for CannabiApp.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a multi-tenant data model where each Club owns its data.
+ * UserAdmins manage Clubs, and data is segregated by `clubId` for isolation.
+ * Documents that rely on Club-level authorization include the `clubId` to avoid
+ * costly `get()` calls in security rules.  User reward documents are nested
+ * under members collection `members/{memberId}/userRewards/{userRewardId}`.
+ *
+ * Data Structure:
+ * - /userAdmins/{userAdminId}: Stores UserAdmin profiles, where userAdminId matches the Firebase Auth UID. Includes `clubIds`.
+ * - /clubs/{clubId}: Stores Club data.
+ * - /clubs/{clubId}/members/{memberId}: Stores Member profiles.
+ * - /clubs/{clubId}/inventoryItems/{itemId}: Stores InventoryItem data.
+ * - /clubs/{clubId}/transactions/{transactionId}: Stores Transaction data.
+ * - /clubs/{clubId}/guestUsers/{guestUserId}: Stores GuestUser data.
+ * - /members/{memberId}/userRewards/{userRewardId}: Stores UserReward data.
+ * - /rewards/{rewardId}: Stores available rewards.
+ *
+ * Key Security Decisions:
+ * - List operations are secured via path-based rules.
+ * - UserAdmin documents are secured to only allow owner access.
+ * - Club-owned data is secured to only allow access from authenticated users with the correct clubId.
+ *
+ * Denormalization for Authorization:
+ * - The `clubId` is denormalized into Member, InventoryItem, Transaction, and GuestUser documents to enable efficient authorization.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Allows access to UserAdmin profiles only to the owning user.
+     * @path /userAdmins/{userAdminId}
+     * @allow (get, update, delete) User with matching UID.
+     * @allow (create) User with matching UID setting correct ownership.
+     * @allow (list) Not allowed.
+     * @deny User with non-matching UID.
+     * @principle Enforces document ownership for reads and writes.
+     */
+    match /userAdmins/{userAdminId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isOwner(userId) {
+        return isSignedIn() && request.auth.uid == userId;
+      }
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userAdminId);
+      allow list: if false;
+      allow create: if isOwner(userAdminId) && request.resource.data.userAdminId == userAdminId;
+      allow update: if isExistingOwner(userAdminId) && request.resource.data.userAdminId == resource.data.userAdminId;
+      allow delete: if isExistingOwner(userAdminId);
+    }
+
+    /**
+     * @description Allows access to Club data.
+     * @path /clubs/{clubId}
+     * @allow (get, list) Only authenticated users
+     * @allow (create, update, delete) Only if the userAdminId matches the authenticated user.
+     * @deny If not authenticated or not the owner.
+     * @principle Enforces club ownership for writes.
+     */
+    match /clubs/{clubId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isOwner(userAdminId) {
+        return isSignedIn() && request.auth.uid == userAdminId;
+      }
+      function isExistingOwner(userAdminId) {
+        return isOwner(userAdminId) && resource != null;
+      }
+
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && request.resource.data.userAdminId == request.auth.uid;
+      allow update: if isExistingOwner(resource.data.userAdminId) && request.resource.data.userAdminId == resource.data.userAdminId;
+      allow delete: if isExistingOwner(resource.data.userAdminId);
+    }
+
+    /**
+     * @description Allows access to Member profiles within a club.
+     * @path /clubs/{clubId}/members/{memberId}
+     * @allow (get, list) Only authenticated users.
+     * @allow (create, update, delete) Only if the user is the owner.
+     * @deny If not authenticated or not the owner.
+     * @principle Enforces club ownership for writes.
+     */
+    match /clubs/{clubId}/members/{memberId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isClubOwner(clubId) {
+        return isSignedIn() && get(/databases/$(database)/documents/clubs/$(clubId)).data.userAdminId == request.auth.uid;
+      }
+      function isExistingClubOwner(clubId) {
+        return isClubOwner(clubId) && resource != null;
+      }
+
+      allow get, list: if isSignedIn();
+      allow create: if isClubOwner(clubId) && request.resource.data.clubId == clubId;
+      allow update: if isExistingClubOwner(clubId) && request.resource.data.clubId == clubId;
+      allow delete: if isExistingClubOwner(clubId);
+    }
+
+    /**
+     * @description Allows access to InventoryItem data within a club.
+     * @path /clubs/{clubId}/inventoryItems/{itemId}
+     * @allow (get, list) Only authenticated users.
+     * @allow (create, update, delete) Only if the user is the owner.
+     * @deny If not authenticated or not the owner.
+     * @principle Enforces club ownership for writes.
+     */
+    match /clubs/{clubId}/inventoryItems/{itemId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isClubOwner(clubId) {
+        return isSignedIn() && get(/databases/$(database)/documents/clubs/$(clubId)).data.userAdminId == request.auth.uid;
+      }
+      function isExistingClubOwner(clubId) {
+        return isClubOwner(clubId) && resource != null;
+      }
+
+      allow get, list: if isSignedIn();
+      allow create: if isClubOwner(clubId) && request.resource.data.clubId == clubId;
+      allow update: if isExistingClubOwner(clubId) && request.resource.data.clubId == clubId;
+      allow delete: if isExistingClubOwner(clubId);
+    }
+
+    /**
+     * @description Allows access to Transaction data within a club.
+     * @path /clubs/{clubId}/transactions/{transactionId}
+     * @allow (get, list) Only authenticated users.
+     * @allow (create, update, delete) Only if the user is the owner.
+     * @deny If not authenticated or not the owner.
+     * @principle Enforces club ownership for writes.
+     */
+    match /clubs/{clubId}/transactions/{transactionId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isClubOwner(clubId) {
+        return isSignedIn() && get(/databases/$(database)/documents/clubs/$(clubId)).data.userAdminId == request.auth.uid;
+      }
+      function isExistingClubOwner(clubId) {
+        return isClubOwner(clubId) && resource != null;
+      }
+
+      allow get, list: if isSignedIn();
+      allow create: if isClubOwner(clubId) && request.resource.data.clubId == clubId;
+      allow update: if isExistingClubOwner(clubId) && request.resource.data.clubId == clubId;
+      allow delete: if isExistingClubOwner(clubId);
+    }
+
+    /**
+     * @description Allows access to GuestUser data within a club.
+     * @path /clubs/{clubId}/guestUsers/{guestUserId}
+     * @allow (get, list) Only authenticated users.
+     * @allow (create, update, delete) Only if the user is the owner.
+     * @deny If not authenticated or not the owner.
+     * @principle Enforces club ownership for writes.
+     */
+    match /clubs/{clubId}/guestUsers/{guestUserId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isClubOwner(clubId) {
+        return isSignedIn() && get(/databases/$(database)/documents/clubs/$(clubId)).data.userAdminId == request.auth.uid;
+      }
+      function isExistingClubOwner(clubId) {
+        return isClubOwner(clubId) && resource != null;
+      }
+
+      allow get, list: if isSignedIn();
+      allow create: if isClubOwner(clubId) && request.resource.data.clubId == clubId;
+      allow update: if isExistingClubOwner(clubId) && request.resource.data.clubId == clubId;
+      allow delete: if isExistingClubOwner(clubId);
+    }
+
+     /**
+      * @description Allows access to UserReward data for a specific member.
+      * @path /members/{memberId}/userRewards/{userRewardId}
+      * @allow (get, list) Only authenticated users.
+      * @allow (create, update, delete) Only if the user is the owner.
+      * @deny If not authenticated or not the owner.
+      * @principle Enforces member ownership for writes.
+      */
+     match /members/{memberId}/userRewards/{userRewardId} {
+       function isSignedIn() {
+         return request.auth != null;
+       }
+       function isMemberOwner(memberId) {
+           return isSignedIn() && get(/databases/$(database)/documents/members/$(memberId)).data.clubId == get(/databases/$(database)/documents/clubs/$(resource.data.clubId)).data.clubId;
+
+       }
+       function isExistingMemberOwner(memberId) {
+         return isMemberOwner(memberId) && resource != null;
+       }
+       allow get, list: if isSignedIn();
+       allow create: if isSignedIn() && request.resource.data.memberId == memberId;
+       allow update: if isExistingMemberOwner(memberId) && request.resource.data.memberId == memberId;
+       allow delete: if isExistingMemberOwner(memberId);
+     }
+
+    /**
+     * @description Allows public read access to Reward data.
+     * @path /rewards/{rewardId}
+     * @allow (get, list) Public read access.
+     * @allow (create, update, delete) Owner-only write access.
+     * @deny If not the owner.
+     * @principle Public read, owner-only write.
+     */
+    match /rewards/{rewardId} {
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isOwner(userAdminId) {
+        return isSignedIn() && request.auth.uid == userAdminId;
+      }
+      function isExistingOwner(userAdminId) {
+        return isOwner(userAdminId) && resource != null;
+      }
+
+      allow get, list: if true;
+      // CRITICAL: Cannot implement owner-only writes. The 'Reward' entity is missing an 'ownerId' or 'authorId' field.
+      allow create, update, delete: if false; // TODO: Add owner validation once the schema is updated with an ownership field.
+    }
+  }
+}

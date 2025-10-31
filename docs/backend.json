@@ -1,0 +1,443 @@
+{
+  "entities": {
+    "Club": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Club",
+      "type": "object",
+      "description": "Represents a club within the CannabiApp multi-tenant platform.",
+      "properties": {
+        "clubId": {
+          "type": "string",
+          "description": "Unique identifier for the Club entity. This is automatically generated upon club registration.",
+          "format": "uuid"
+        },
+        "userAdminId": {
+          "type": "string",
+          "description": "Reference to the UserAdmin who created the club. (Relationship: UserAdmin 1:N Club)"
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the club."
+        },
+        "dateCreated": {
+          "type": "string",
+          "description": "The date the club was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "clubId",
+        "userAdminId",
+        "name",
+        "dateCreated"
+      ]
+    },
+    "UserAdmin": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserAdmin",
+      "type": "object",
+      "description": "Represents the administrator of a club.",
+      "properties": {
+        "userAdminId": {
+          "type": "string",
+          "description": "Unique identifier for the UserAdmin entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address of the user administrator.",
+          "format": "email"
+        },
+        "clubIds": {
+          "type": "array",
+          "description": "References to Clubs managed by this admin. (Relationship: UserAdmin 1:N Club)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "userAdminId",
+        "email",
+        "clubIds"
+      ]
+    },
+    "Member": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Member",
+      "type": "object",
+      "description": "Represents a member associated with a club.",
+      "properties": {
+        "memberId": {
+          "type": "string",
+          "description": "Unique identifier for the Member entity."
+        },
+        "clubId": {
+          "type": "string",
+          "description": "Reference to the Club this member belongs to. (Relationship: Club 1:N Member)"
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Full name of the member."
+        },
+        "photoId": {
+          "type": "string",
+          "description": "Photo ID of the member. Can be a reference to external storage."
+        }
+      },
+      "required": [
+        "memberId",
+        "clubId",
+        "fullName",
+        "photoId"
+      ]
+    },
+    "InventoryItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "InventoryItem",
+      "type": "object",
+      "description": "Represents an item in the club's inventory.",
+      "properties": {
+        "itemId": {
+          "type": "string",
+          "description": "Unique identifier for the InventoryItem entity."
+        },
+        "clubId": {
+          "type": "string",
+          "description": "Reference to the Club this item belongs to. (Relationship: Club 1:N InventoryItem)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the inventory item."
+        },
+        "group": {
+          "type": "string",
+          "description": "Group the item belongs to."
+        },
+        "category": {
+          "type": "string",
+          "description": "Category of the item."
+        },
+        "minimumUnitOfSale": {
+          "type": "number",
+          "description": "Minimum unit of sale for the item."
+        },
+        "amountPerUnit": {
+          "type": "number",
+          "description": "Amount in euros per unit."
+        },
+        "stockLevel": {
+          "type": "number",
+          "description": "Current stock level of the item."
+        }
+      },
+      "required": [
+        "itemId",
+        "clubId",
+        "name",
+        "group",
+        "category",
+        "minimumUnitOfSale",
+        "amountPerUnit",
+        "stockLevel"
+      ]
+    },
+    "Transaction": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Transaction",
+      "type": "object",
+      "description": "Represents a transaction (dispense or refill).",
+      "properties": {
+        "transactionId": {
+          "type": "string",
+          "description": "Unique identifier for the Transaction entity."
+        },
+        "clubId": {
+          "type": "string",
+          "description": "Reference to the Club this transaction belongs to. (Relationship: Club 1:N Transaction)"
+        },
+        "memberId": {
+          "type": "string",
+          "description": "Reference to the Member involved in the transaction. (Relationship: Member 1:N Transaction)"
+        },
+        "itemId": {
+          "type": "string",
+          "description": "Reference to the InventoryItem involved in the transaction. (Relationship: InventoryItem 1:N Transaction)"
+        },
+        "transactionType": {
+          "type": "string",
+          "description": "Type of transaction (dispense or refill)."
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Quantity of items involved in the transaction."
+        },
+        "transactionDate": {
+          "type": "string",
+          "description": "Date and time of the transaction.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "transactionId",
+        "clubId",
+        "memberId",
+        "itemId",
+        "transactionType",
+        "quantity",
+        "transactionDate"
+      ]
+    },
+    "GuestUser": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GuestUser",
+      "type": "object",
+      "description": "Represents a guest user with restricted access to a club.",
+      "properties": {
+        "guestUserId": {
+          "type": "string",
+          "description": "Unique identifier for the GuestUser entity."
+        },
+        "clubId": {
+          "type": "string",
+          "description": "Reference to the Club this guest user belongs to. (Relationship: Club 1:N GuestUser)"
+        },
+        "permissions": {
+          "type": "array",
+          "description": "List of permissions granted to the guest user.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "guestUserId",
+        "clubId",
+        "permissions"
+      ]
+    },
+    "Reward": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Reward",
+      "type": "object",
+      "description": "Represents a reward or benefit that can be earned by a user.",
+      "properties": {
+        "rewardId": {
+          "type": "string",
+          "description": "Unique identifier for the Reward entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the reward."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the reward."
+        },
+        "pointsRequired": {
+          "type": "number",
+          "description": "Number of points required to redeem the reward."
+        }
+      },
+      "required": [
+        "rewardId",
+        "name",
+        "description",
+        "pointsRequired"
+      ]
+    },
+    "UserReward": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "UserReward",
+      "type": "object",
+      "description": "Represents a user's association with a reward, tracking their progress and redemption status.",
+      "properties": {
+        "userRewardId": {
+          "type": "string",
+          "description": "Unique identifier for the UserReward entity."
+        },
+        "memberId": {
+          "type": "string",
+          "description": "Reference to the Member who earned the reward. (Relationship: Member 1:N UserReward)"
+        },
+        "rewardId": {
+          "type": "string",
+          "description": "Reference to the Reward earned. (Relationship: Reward 1:N UserReward)"
+        },
+        "pointsEarned": {
+          "type": "number",
+          "description": "Number of points earned by the user towards this reward."
+        },
+        "redeemed": {
+          "type": "boolean",
+          "description": "Indicates whether the reward has been redeemed."
+        }
+      },
+      "required": [
+        "userRewardId",
+        "memberId",
+        "rewardId",
+        "pointsEarned",
+        "redeemed"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/userAdmins/{userAdminId}",
+        "definition": {
+          "entityName": "UserAdmin",
+          "schema": {
+            "$ref": "#/backend/entities/UserAdmin"
+          },
+          "description": "Stores UserAdmin profiles. The `userAdminId` matches the Firebase Auth UID. Includes an array `clubIds` of clubs managed by this admin.",
+          "params": [
+            {
+              "name": "userAdminId",
+              "description": "The unique ID of the user admin, matching the Firebase Auth UID."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/clubs/{clubId}",
+        "definition": {
+          "entityName": "Club",
+          "schema": {
+            "$ref": "#/backend/entities/Club"
+          },
+          "description": "Stores Club data.  The `clubId` is denormalized into all subcollections for authorization independence.",
+          "params": [
+            {
+              "name": "clubId",
+              "description": "The unique ID of the club."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/clubs/{clubId}/members/{memberId}",
+        "definition": {
+          "entityName": "Member",
+          "schema": {
+            "$ref": "#/backend/entities/Member"
+          },
+          "description": "Stores Member profiles. Includes denormalized `clubId` for authorization independence.",
+          "params": [
+            {
+              "name": "clubId",
+              "description": "The unique ID of the club."
+            },
+            {
+              "name": "memberId",
+              "description": "The unique ID of the member."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/clubs/{clubId}/inventoryItems/{itemId}",
+        "definition": {
+          "entityName": "InventoryItem",
+          "schema": {
+            "$ref": "#/backend/entities/InventoryItem"
+          },
+          "description": "Stores InventoryItem data. Includes denormalized `clubId` for authorization independence.",
+          "params": [
+            {
+              "name": "clubId",
+              "description": "The unique ID of the club."
+            },
+            {
+              "name": "itemId",
+              "description": "The unique ID of the inventory item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/clubs/{clubId}/transactions/{transactionId}",
+        "definition": {
+          "entityName": "Transaction",
+          "schema": {
+            "$ref": "#/backend/entities/Transaction"
+          },
+          "description": "Stores Transaction data. Includes denormalized `clubId` for authorization independence.",
+          "params": [
+            {
+              "name": "clubId",
+              "description": "The unique ID of the club."
+            },
+            {
+              "name": "transactionId",
+              "description": "The unique ID of the transaction."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/clubs/{clubId}/guestUsers/{guestUserId}",
+        "definition": {
+          "entityName": "GuestUser",
+          "schema": {
+            "$ref": "#/backend/entities/GuestUser"
+          },
+          "description": "Stores GuestUser data. Includes denormalized `clubId` for authorization independence.",
+          "params": [
+            {
+              "name": "clubId",
+              "description": "The unique ID of the club."
+            },
+            {
+              "name": "guestUserId",
+              "description": "The unique ID of the guest user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/members/{memberId}/userRewards/{userRewardId}",
+        "definition": {
+          "entityName": "UserReward",
+          "schema": {
+            "$ref": "#/backend/entities/UserReward"
+          },
+          "description": "Stores UserReward data. Nests rewards within the members collection.",
+          "params": [
+            {
+              "name": "memberId",
+              "description": "The unique ID of the member."
+            },
+            {
+              "name": "userRewardId",
+              "description": "The unique ID of the user reward."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/rewards/{rewardId}",
+        "definition": {
+          "entityName": "Reward",
+          "schema": {
+            "$ref": "#/backend/entities/Reward"
+          },
+          "description": "Stores available rewards.",
+          "params": [
+            {
+              "name": "rewardId",
+              "description": "The unique ID of the reward."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support a multi-tenant application where each 'Club' owns its data. UserAdmin manages Clubs. Data is segregated by `clubId` to ensure isolation.\n\n*   **Authorization Independence:** Every document that relies on Club-level authorization (Members, InventoryItems, Transactions, GuestUsers) includes the `clubId`. The UserAdmin relationship to clubs is managed via `/userAdmins/{userAdminId}` and each userAdmin document includes `clubIds`.\n*   **QAPs (Rules are not Filters):** List operations are secured via path-based rules. For example, listing members is done under `/clubs/{clubId}/members`, ensuring that only members of a specific club can be listed when the rule enforces `request.auth.uid == resource.data.clubId`. Similar strategies apply to Inventory, Transactions, and GuestUsers.  User rewards are nested under `/members/{memberId}/userRewards/{userRewardId}`.\n\nThis design avoids `get()` calls in security rules and enforces atomic operations."
+  }
+}
