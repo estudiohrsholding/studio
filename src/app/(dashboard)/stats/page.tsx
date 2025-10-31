@@ -58,8 +58,9 @@ export default function StatsPage() {
 
     const transactionsQuery = query(
       collection(getFirestore(), 'clubs', clubId, 'transactions'),
+      where('type', '==', 'dispense-log'),
       where('transactionDate', '>=', sevenDaysAgo),
-      where('type', '==', 'dispense-log')
+      orderBy('transactionDate', 'desc')
     );
 
     const unsubscribe = onSnapshot(transactionsQuery, (snapshot) => {
@@ -88,14 +89,14 @@ export default function StatsPage() {
         .reverse(); // To have the oldest day first
 
       setDailySalesData(chartData);
-      if (stockDistributionData.length > 0) setIsLoading(false);
+      if (stockDistributionData.length > 0 && !isLoading) setIsLoading(false);
     }, (error) => {
         console.error("Error fetching sales data: ", error);
-        if (stockDistributionData.length > 0) setIsLoading(false);
+        if (stockDistributionData.length > 0 && !isLoading) setIsLoading(false);
     });
 
     return () => unsubscribe();
-  }, [clubId]);
+  }, [clubId, stockDistributionData, isLoading]);
 
   // Effect for Stock Distribution and Low Stock
   useEffect(() => {
@@ -134,14 +135,20 @@ export default function StatsPage() {
         
         setStockDistributionData(stockData);
         setLowStockItems(items.filter(item => item.stockLevel < 20));
-        if (dailySalesData.length > 0) setIsLoading(false);
+        if (dailySalesData.length > 0 && !isLoading) setIsLoading(false);
     }, (error) => {
         console.error("Error fetching inventory data: ", error);
-        if (dailySalesData.length > 0) setIsLoading(false);
+        if (dailySalesData.length > 0 && !isLoading) setIsLoading(false);
     });
 
     return () => unsubscribe();
-  }, [clubId]);
+  }, [clubId, dailySalesData, isLoading]);
+
+  useEffect(() => {
+    if (dailySalesData.length > 0 && stockDistributionData.length > 0) {
+      setIsLoading(false);
+    }
+  }, [dailySalesData, stockDistributionData]);
 
 
   return (
