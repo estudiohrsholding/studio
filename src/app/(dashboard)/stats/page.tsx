@@ -41,17 +41,21 @@ interface StockDistribution {
 
 export default function StatsPage() {
   const clubId = useAuthStore((state) => state.clubId);
+  
   const [dailySalesData, setDailySalesData] = useState<DailySale[]>([]);
   const [stockDistributionData, setStockDistributionData] = useState<StockDistribution[]>([]);
   const [lowStockItems, setLowStockItems] = useState<Item[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  
+  const [isSalesLoading, setIsSalesLoading] = useState(true);
+  const [isStockLoading, setIsStockLoading] = useState(true);
 
   // Effect for Daily Sales Data
   useEffect(() => {
     if (!clubId) {
-        setIsLoading(false);
+        setIsSalesLoading(false);
         return;
     }
+    setIsSalesLoading(true);
     
     const today = new Date();
     const sevenDaysAgo = startOfDay(subDays(today, 6));
@@ -89,21 +93,22 @@ export default function StatsPage() {
         .reverse(); // To have the oldest day first
 
       setDailySalesData(chartData);
-      if (stockDistributionData.length > 0 && !isLoading) setIsLoading(false);
+      setIsSalesLoading(false);
     }, (error) => {
         console.error("Error fetching sales data: ", error);
-        if (stockDistributionData.length > 0 && !isLoading) setIsLoading(false);
+        setIsSalesLoading(false);
     });
 
     return () => unsubscribe();
-  }, [clubId, stockDistributionData, isLoading]);
+  }, [clubId]);
 
   // Effect for Stock Distribution and Low Stock
   useEffect(() => {
     if (!clubId) {
-        setIsLoading(false);
+        setIsStockLoading(false);
         return;
     }
+    setIsStockLoading(true);
     
     const inventoryQuery = query(
       collection(getFirestore(), 'clubs', clubId, 'inventoryItems'),
@@ -135,21 +140,16 @@ export default function StatsPage() {
         
         setStockDistributionData(stockData);
         setLowStockItems(items.filter(item => item.stockLevel < 20));
-        if (dailySalesData.length > 0 && !isLoading) setIsLoading(false);
+        setIsStockLoading(false);
     }, (error) => {
         console.error("Error fetching inventory data: ", error);
-        if (dailySalesData.length > 0 && !isLoading) setIsLoading(false);
+        setIsStockLoading(false);
     });
 
     return () => unsubscribe();
-  }, [clubId, dailySalesData, isLoading]);
+  }, [clubId]);
 
-  useEffect(() => {
-    if (dailySalesData.length > 0 && stockDistributionData.length > 0) {
-      setIsLoading(false);
-    }
-  }, [dailySalesData, stockDistributionData]);
-
+  const isLoading = isSalesLoading || isStockLoading;
 
   return (
     <>
