@@ -74,58 +74,84 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
   const [idPhoto, setIdPhoto] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const clubId = useAuthStore((state) => state.clubId);
 
-  const handleSubmit = async (event: FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setIsLoading(true);
+    console.log('%c[DEBUG] 1. handleSubmit: Triggered.', 'color: #00FF00');
+
+    // Get all states
+    const clubId = useAuthStore.getState().clubId;
+    const data = {
+      fullName, // from form state
+      email, // from form state
+      idPhoto, // from file state
+    };
+
+    console.log('[DEBUG] 2. Validating input...', { clubId, ...data });
+    setIsLoading(true); // Button now says "Saving..."
     setError(null);
 
-    if (!clubId || !fullName || !email || !idPhoto) {
+    // --- Guard Clauses ---
+    if (!clubId) {
+      console.error('%c[DEBUG] 3. FAILURE: clubId is null.', 'color: #FF0000');
+      setError('Could not identify the club. Please log in again.');
+      setIsLoading(false);
+      return;
+    }
+    if (!data.fullName || !data.email || !data.idPhoto) {
+      console.error('%c[DEBUG] 3. FAILURE: Form is incomplete.', 'color: #FF0000');
       setError('Please fill out all fields and select an ID photo.');
       setIsLoading(false);
       return;
     }
 
     try {
-      // 1. Upload file to Firebase Storage
-      console.log('Uploading file...');
+      // --- STEP 1: UPLOAD FILE ---
+      console.log('[DEBUG] 4. Creating Storage reference...');
       const storage = getStorage();
-      const uniqueFileName = `${uuidv4()}-${idPhoto.name}`;
-      const storageRef = ref(
-        storage,
-        `clubs/${clubId}/member_ids/${uniqueFileName}`
-      );
-      await uploadBytes(storageRef, idPhoto);
+      const uniqueFileName = `${uuidv4()}-${data.idPhoto.name}`;
+      const storageRef = ref(storage, `clubs/${clubId}/member_ids/${uniqueFileName}`);
+      console.log('%c[DEBUG] 5. Storage Path:', 'color: #00FFFF', storageRef.path);
 
-      // 2. Get the download URL
-      console.log('Getting download URL...');
+      console.log('[DEBUG] 6. Awaiting uploadBytes()...');
+      await uploadBytes(storageRef, data.idPhoto);
+      console.log('%c[DEBUG] 7. SUCCESS: File Uploaded.', 'color: #00FF00');
+
+      // --- STEP 2: GET URL ---
+      console.log('[DEBUG] 8. Awaiting getDownloadURL()...');
       const downloadURL = await getDownloadURL(storageRef);
+      console.log('%c[DEBUG] 9. SUCCESS: Got URL:', 'color: #00FF00', downloadURL);
 
-      // 3. Prepare data and write to Firestore
+      // --- STEP 3: WRITE DOCUMENT ---
       const newMemberData = {
-        name: fullName,
-        email: email,
+        name: data.fullName,
+        email: data.email,
         idPhotoUrl: downloadURL,
         clubId: clubId,
         createdAt: serverTimestamp(),
-        avatar: `https://picsum.photos/seed/${uuidv4()}/200/200`,
+        avatar: `https://picsum.photos/seed/${uuidv4()}/200/200`, // Match existing schema
       };
+      console.log('[DEBUG] 10. Built Firestore object:', newMemberData);
 
-      console.log('Writing document to Firestore...');
       const db = getFirestore();
       const membersColRef = collection(db, 'clubs', clubId, 'members');
+      console.log('[DEBUG] 11. Awaiting addDoc()...');
       await addDoc(membersColRef, newMemberData);
+      console.log('%c[DEBUG] 12. SUCCESS: Doc written to Firestore.', 'color: #00FF00');
 
-      // 4. Close modal on success
-      onMemberAdded();
-    } catch (err: any) {
-      console.error('Failed to add member:', err);
-      setError(`An unexpected error occurred: ${err.message}`);
+      console.log('[DEBUG] 13. Calling onMemberAdded()...');
+      onMemberAdded(); // Close the modal
+
+    } catch (error: any) {
+      console.error('%c[DEBUG] 14. CRITICAL FAILURE in try block:', 'color: #FF0000', error.code, error.message);
+      console.error(error);
+      setError(`An unexpected error occurred: ${error.message}`);
     } finally {
-      setIsLoading(false);
+      console.log('[DEBUG] 15. Finally block executed.');
+      setIsLoading(false); // This MUST run to reset the button
     }
   };
+
 
   return (
     <Dialog
@@ -390,5 +416,3 @@ export default function MembersPage() {
     </>
   );
 }
-
-    
