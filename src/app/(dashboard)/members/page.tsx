@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import Image from 'next/image';
@@ -87,6 +88,7 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
       email: email,
       avatar: `https://picsum.photos/seed/${Math.random()}/200/200`,
       createdAt: serverTimestamp(),
+      clubId: clubId, // This line fixes the permission error
     };
     console.log('[DEBUG] newMemberData:', newMemberData);
 
