@@ -202,13 +202,14 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
         ...newItemData,
         isMembership: true,
         duration: membershipTimeUnit,
+        stockLevel: undefined, // Explicitly ensure stockLevel is not written
       };
     } else {
       newItemData = {
         ...newItemData,
         isMembership: false,
         stockLevel: Number(stock),
-        duration: undefined,
+        duration: undefined, // Explicitly ensure duration is not written
       };
     }
 
@@ -258,10 +259,6 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
               <Input id="category" value={category} onChange={(e) => setCategory(e.target.value)} className="col-span-3" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="min-unit" className="text-right">Min. Sale Unit</Label>
-              <Input id="min-unit" type="number" step="0.1" value={minSaleUnit} onChange={(e) => setMinSaleUnit(e.target.value)} className="col-span-3" required={!isMembershipGroup} />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="price" className="text-right">Price (€)</Label>
               <Input id="price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="col-span-3" required />
             </div>
@@ -271,10 +268,16 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
                 <Input id="duration" value={membershipTimeUnit} onChange={(e) => setMembershipTimeUnit(e.target.value)} placeholder="e.g., 30 days, 1 year" className="col-span-3" required />
               </div>
             ) : (
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="stock" className="text-right">Initial Stock</Label>
-                <Input id="stock" type="number" value={stock} onChange={(e) => setStock(e.target.value)} className="col-span-3" required />
-              </div>
+              <>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="min-unit" className="text-right">Min. Sale Unit</Label>
+                    <Input id="min-unit" type="number" step="0.1" value={minSaleUnit} onChange={(e) => setMinSaleUnit(e.target.value)} className="col-span-3" required />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="stock" className="text-right">Initial Stock</Label>
+                    <Input id="stock" type="number" value={stock} onChange={(e) => setStock(e.target.value)} className="col-span-3" required />
+                </div>
+              </>
             )}
           </div>
           <DialogFooter>
@@ -297,17 +300,20 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
     const [isLoading, setIsLoading] = useState(false);
     const clubId = useAuthStore((state) => state.clubId);
 
-    const isMembershipGroup = useMemo(() => item?.isMembership || group.trim().toLowerCase() === 'membresías', [item, group]);
+    const isMembership = useMemo(() => item?.isMembership, [item]);
 
     useEffect(() => {
         if (item) {
             setName(item.name);
             setGroup(item.group);
             setCategory(item.category);
-            setMinSaleUnit(String(item.minimumUnitOfSale || ''));
             setPrice(String(item.amountPerUnit));
             if (item.isMembership) {
                 setDuration(item.duration || '');
+                setMinSaleUnit('');
+            } else {
+                setMinSaleUnit(String(item.minimumUnitOfSale || ''));
+                setDuration('');
             }
         }
     }, [item]);
@@ -322,16 +328,16 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
             name,
             group,
             category,
-            minimumUnitOfSale: Number(minSaleUnit),
             amountPerUnit: Number(price),
         };
 
-        if (isMembershipGroup) {
+        if (isMembership) {
             updatedData.duration = duration;
-            updatedData.stockLevel = undefined; 
-            updatedData.isMembership = true;
+            updatedData.minimumUnitOfSale = 1;
+            updatedData.stockLevel = undefined; // Ensure stockLevel is removed
         } else {
-            updatedData.duration = undefined;
+            updatedData.minimumUnitOfSale = Number(minSaleUnit);
+            updatedData.duration = undefined; // Ensure duration is removed
             // Note: We don't update stockLevel here as it's handled by RefillDialog
         }
 
@@ -369,17 +375,18 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
                             <Input id="edit-category" value={category} onChange={(e) => setCategory(e.target.value)} className="col-span-3" required />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-min-unit" className="text-right">Min. Sale Unit</Label>
-                            <Input id="edit-min-unit" type="number" step="0.1" value={minSaleUnit} onChange={(e) => setMinSaleUnit(e.target.value)} className="col-span-3" disabled={isMembershipGroup} />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="edit-price" className="text-right">Price (€)</Label>
                             <Input id="edit-price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="col-span-3" required />
                         </div>
-                         {isMembershipGroup && (
+                         {isMembership ? (
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="edit-duration" className="text-right">Duration</Label>
                                 <Input id="edit-duration" value={duration} onChange={(e) => setDuration(e.target.value)} className="col-span-3" required />
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit-min-unit" className="text-right">Min. Sale Unit</Label>
+                                <Input id="edit-min-unit" type="number" step="0.1" value={minSaleUnit} onChange={(e) => setMinSaleUnit(e.target.value)} className="col-span-3" />
                             </div>
                         )}
                     </div>
@@ -711,3 +718,5 @@ export default function InventoryPage() {
     </>
   );
 }
+
+    
