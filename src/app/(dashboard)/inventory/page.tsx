@@ -311,25 +311,33 @@ function InventoryList() {
     const clubId = useAuthStore((state) => state.clubId);
     
     useEffect(() => {
-        if (!clubId) {
-            setItems([]);
-            setIsLoading(false);
-            return;
-        }
-
-        const db = getFirestore();
-        const itemsQuery = query(collection(db, 'clubs', clubId, 'inventoryItems'), orderBy('createdAt', 'desc'));
-
-        const unsubscribe = onSnapshot(itemsQuery, (snapshot) => {
-            const itemsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Item));
-            setItems(itemsData);
-            setIsLoading(false);
-        }, (error) => {
-            console.error("Error fetching inventory items: ", error);
-            setIsLoading(false);
-        });
-
-        return () => unsubscribe();
+      if (!clubId) {
+        console.log('%c[DEBUG LIST] Listener not attached (no clubId).', 'color: #800080');
+        setItems([]);
+        setIsLoading(false);
+        return;
+      }
+    
+      console.log('%c[DEBUG LIST] 1. New render, attaching snapshot listener...', 'color: #800080');
+      const db = getFirestore();
+      const itemsQuery = query(collection(db, 'clubs', clubId, 'inventoryItems'), orderBy('createdAt', 'desc'));
+    
+      const unsubscribe = onSnapshot(itemsQuery, (snapshot) => {
+        console.log('%c[DEBUG LIST] 2. Snapshot fired! Found documents:', 'color: #800080', snapshot.size);
+        const itemsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Item));
+    
+        console.log('[DEBUG LIST] 3. New state being set:', itemsData); 
+        setItems(itemsData);
+        setIsLoading(false);
+      }, (error) => {
+        console.error('%c[DEBUG LIST] 4. Snapshot listener FAILED:', 'color: #FF0000', error);
+        setIsLoading(false);
+      });
+    
+      return () => {
+        console.log('%c[DEBUG LIST] 5. Detaching listener.', 'color: #800080');
+        unsubscribe();
+      };
     }, [clubId]);
 
     if (isLoading) {
@@ -448,5 +456,3 @@ export default function InventoryPage() {
     </>
   );
 }
-
-    
