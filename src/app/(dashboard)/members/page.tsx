@@ -188,7 +188,7 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
 function MembersList() {
   const [members, setMembers] = useState<Member[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { firestore }_ = useFirebase();
+  const { firestore } = useFirebase();
   const clubId = useAuthStore((state) => state.clubId);
 
   useEffect(() => {
