@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -50,7 +49,7 @@ export default function StatsPage() {
   const [isSalesLoading, setIsSalesLoading] = useState(true);
   const [isStockLoading, setIsStockLoading] = useState(true);
 
-  // Effect for Daily Sales Data
+  // Effect for Daily Sales Data (No changes needed here)
   useEffect(() => {
     if (!clubId) {
         setIsSalesLoading(false);
@@ -102,7 +101,7 @@ export default function StatsPage() {
     return () => unsubscribe();
   }, [clubId]);
 
-  // Effect for Stock Distribution and Low Stock
+  // Effect for Stock Distribution and Low Stock (CORRECTED)
   useEffect(() => {
     if (!clubId) {
         setIsStockLoading(false);
@@ -123,6 +122,7 @@ export default function StatsPage() {
         const stockByCategory: Record<string, number> = {};
         
         items.forEach(item => {
+            // Ensure necessary fields are present, using '??' for safety
             const group = item.group || 'Uncategorized';
             const category = item.category || 'Uncategorized';
             const stock = item.stockLevel || 0;
@@ -135,16 +135,26 @@ export default function StatsPage() {
             'var(--color-flowers)', 'var(--color-oils)', 'var(--color-edibles)', 
             'var(--color-vapes)', 'var(--color-topicals)'
         ];
-
-        const stockData = Object.entries(stockByCategory).map(([category, stock], index) => ({
-            category,
-            stock,
-            fill: chartColors[index % chartColors.length]
+        
+        // CORRECTED: Mapping raw data objects into ChartDataItem format
+        const groupChartData: ChartDataItem[] = Object.entries(stockByGroup).map(([groupName, stock], index) => ({
+            name: groupName,
+            value: stock,
+            fill: chartColors[index % chartColors.length] // Assigning color based on index
         }));
 
-        setGroupDistributionData(groupData);
-        setCategoryDistributionData(categoryData);
-        setLowStockItems(items.filter(item => item.stockLevel < 20));
+        const categoryChartData: ChartDataItem[] = Object.entries(stockByCategory).map(([categoryName, stock], index) => ({
+            name: categoryName,
+            value: stock,
+            fill: chartColors[index % chartColors.length] // Assigning color based on index
+        }));
+
+
+        setGroupDistributionData(groupChartData); // CORRECTED: Now passing groupChartData
+        setCategoryDistributionData(categoryChartData); // CORRECTED: Now passing categoryChartData
+        
+        // CORRECTED: Simplified call to state setter function
+        setLowStockItems(items.filter(item => (item.stockLevel || 0) < 20)); 
         setIsStockLoading(false);
     }, (error) => {
         console.error("Error fetching inventory data: ", error);
