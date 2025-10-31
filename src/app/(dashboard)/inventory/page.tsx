@@ -42,15 +42,78 @@ import {
   query,
   onSnapshot,
   orderBy,
+  doc,
+  updateDoc,
+  increment,
 } from 'firebase/firestore';
 import { useAuthStore } from '@/store/authStore';
 import { useFirebase } from '@/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Item } from '@/lib/types';
 
-function RefillDialog({ itemName }: { itemName: string }) {
+function RefillDialog({ item }: { item: Item }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [amountToAdd, setAmountToAdd] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleRefill = async (event: FormEvent) => {
+    event.preventDefault();
+    console.log('%c[DEBUG REFILL] 1. handleRefill: Triggered.', 'color: #00FF00');
+
+    const refillAmount = Number(amountToAdd);
+    console.log('[DEBUG REFILL] 2. Refill Amount:', refillAmount);
+    console.log('[DEBUG REFILL] 3. Item ID:', item.id);
+
+    setIsLoading(true);
+
+    if (refillAmount <= 0) {
+      console.error('%c[DEBUG REFILL] 4. FAILURE: Refill amount must be greater than 0.', 'color: #FF0000');
+      // Here you would typically show a toast or an inline error to the user
+      setIsLoading(false);
+      return;
+    }
+
+    const clubId = useAuthStore.getState().clubId;
+    console.log('%c[DEBUG REFILL] 5. clubId:', 'color: #FFA500', clubId);
+
+    if (!clubId || !item.id) {
+      console.error('%c[DEBUG REFILL] 6. FAILURE: clubId or itemId is null.', 'color: #FF0000');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const db = getFirestore();
+      const itemDocRef = doc(db, 'clubs', clubId, 'inventoryItems', item.id);
+      console.log('%c[DEBUG REFILL] 7. Firestore Path:', 'color: #00FFFF', itemDocRef.path);
+      
+      console.log('[DEBUG REFILL] 8. Attempting atomic updateDoc() with increment()...');
+      await updateDoc(itemDocRef, {
+        stockLevel: increment(refillAmount) 
+      });
+      console.log('%c[DEBUG REFILL] 9. SUCCESS: updateDoc() completed.', 'color: #00FF00');
+      
+      console.log('[DEBUG REFILL] 10. Attempting onClose()...');
+      setIsOpen(false); // Close the modal on success
+      console.log('%c[DEBUG REFILL] 11. SUCCESS: onClose() called.', 'color: #00FF00');
+
+    } catch (error: any) {
+      console.error('%c[DEBUG REFILL] 12. CRITICAL FAILURE in try block:', 'color: #FF0000', error.message);
+      console.error(error);
+    } finally {
+      console.log('[DEBUG REFILL] 13. Finally block executed.');
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <Dialog>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+        setIsOpen(open);
+        if (!open) {
+            setAmountToAdd('');
+            setIsLoading(false);
+        }
+    }}>
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="h-8 w-8">
           <Plus className="h-4 w-4" />
@@ -58,21 +121,33 @@ function RefillDialog({ itemName }: { itemName: string }) {
         </Button>
       </DialogTrigger>
       <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="font-headline">Refill: {itemName}</DialogTitle>
-          <DialogDescription>Add units to the existing stock.</DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="units" className="text-right">
-              Units to Add
-            </Label>
-            <Input id="units" type="number" defaultValue="10" className="col-span-3" />
+        <form onSubmit={handleRefill}>
+          <DialogHeader>
+            <DialogTitle className="font-headline">Refill: {item.name}</DialogTitle>
+            <DialogDescription>Add units to the existing stock.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="units" className="text-right">
+                Units to Add
+              </Label>
+              <Input 
+                id="units" 
+                type="number" 
+                value={amountToAdd}
+                onChange={(e) => setAmountToAdd(e.target.value)}
+                placeholder="e.g., 10" 
+                className="col-span-3" 
+                required
+              />
+            </div>
           </div>
-        </div>
-        <DialogFooter>
-          <Button type="submit">Confirm Refill</Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? 'Confirming...' : 'Confirm Refill'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
@@ -311,15 +386,15 @@ function InventoryList() {
                             </div>
                         </TableCell>
                         <TableCell><Badge variant="secondary">{item.category}</Badge></TableCell>
-                        <TableCell>€{(item.price || 0).toFixed(2)}</TableCell>
+                        <TableCell>€{(item.amountPerUnit || 0).toFixed(2)}</TableCell>
                         <TableCell>
-                            <span className={item.stock < 15 ? 'text-destructive font-medium' : ''}>
-                                {item.stock}
+                            <span className={item.stockLevel < 15 ? 'text-destructive font-medium' : ''}>
+                                {item.stockLevel}
                             </span>
-                            <span className="text-muted-foreground"> {item.minSaleUnit}</span>
+                            <span className="text-muted-foreground"> {item.minimumUnitOfSale}</span>
                         </TableCell>
                         <TableCell className="text-right">
-                            <RefillDialog itemName={item.name} />
+                            <RefillDialog item={item} />
                         </TableCell>
                     </TableRow>
                 ))}

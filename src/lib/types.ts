@@ -23,11 +23,11 @@ export type Item = {
   name:string;
   group: string;
   category: string;
-  minSaleUnit: string;
-  price: number;
-  stock: number;
-  imageUrl: string;
-  imageHint: string;
+  minimumUnitOfSale: number;
+  amountPerUnit: number;
+  stockLevel: number;
+  imageUrl?: string;
+  imageHint?: string;
 };
 
 export type Transaction = {
@@ -42,3 +42,5 @@ export type Transaction = {
   date: string;
   user: string;
 };
+
+    
