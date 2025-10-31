@@ -37,6 +37,7 @@ import {
   doc,
   serverTimestamp,
   increment,
+  updateDoc,
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -284,12 +285,18 @@ export default function POSPage() {
         for (const item of cart) {
             if (item.isMembership && item.duration) {
                 // --- Membership Logic ---
+                console.log(`[FIX] Processing membership: ${item.name} for member ${selectedMember.id}`);
                 const memberDocRef = doc(db, 'clubs', clubId, 'members', selectedMember.id);
                 const newExpiration = calculateNewExpiration(item.duration);
+                console.log(`[FIX] New expiration calculated: ${newExpiration.toDate()}`);
+                
+                // 🔥 THE FIX: The missing update call is added here.
                 batch.update(memberDocRef, {
                     membershipExpiresAt: newExpiration,
                     isVetoed: false // Selling a membership un-vetoes a user
                 });
+                console.log(`[FIX] Queued update for member ${selectedMember.id} with new expiration.`);
+
             } else {
                 // --- Standard Item Logic ---
                 const itemDocRef = doc(db, 'clubs', clubId, 'inventoryItems', item.id);
@@ -312,7 +319,9 @@ export default function POSPage() {
             });
         }
 
+        console.log('[FIX] Committing batch write...');
         await batch.commit();
+        console.log('[FIX] Batch commit successful.');
         setShowConfirmation(true);
 
     } catch (error: any) {
@@ -629,3 +638,4 @@ export default function POSPage() {
     </>
   );
 }
+    
