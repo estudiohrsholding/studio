@@ -155,7 +155,9 @@ export default function HistoryPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {entry.transactionDate?.toDate().toLocaleString() ?? 'N/A'}
+                        {entry.transactionDate && typeof entry.transactionDate.toDate === 'function'
+                          ? entry.transactionDate.toDate().toLocaleString()
+                          : 'N/A'}
                       </TableCell>
                       <TableCell className="text-right">
                         {entry.amount ? `€${entry.amount.toFixed(2)}` : '-'}
