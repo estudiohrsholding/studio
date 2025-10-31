@@ -1,4 +1,10 @@
-import Link from 'next/link';
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+import { useAuthStore } from '@/store/authStore';
+import { Logo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -9,10 +15,64 @@ import {
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Logo } from '@/components/icons';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const { setLoginData } = useAuthStore();
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const auth = getAuth();
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+      const user = userCredential.user;
+
+      const idTokenResult = await user.getIdTokenResult(true);
+      const { clubId, role } = idTokenResult.claims;
+
+      if (!clubId) {
+        throw new Error(
+          'AUTH_ERR: No tenant (clubId) associated with this account.'
+        );
+      }
+
+      setLoginData({
+        uid: user.uid,
+        clubId: clubId as string,
+        role: role as string,
+      });
+
+      router.push('/home');
+    } catch (err: any) {
+      setIsLoading(false);
+      let errorMessage = 'An unexpected error occurred. Please try again.';
+      if (err.code) {
+        switch (err.code) {
+          case 'auth/wrong-password':
+          case 'auth/user-not-found':
+          case 'auth/invalid-credential':
+            errorMessage = 'Invalid credentials. Please check your email and password.';
+            break;
+        }
+      } else if (err.message.startsWith('AUTH_ERR:')) {
+        errorMessage = err.message;
+      }
+      setError(errorMessage);
+    }
+  };
+
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
@@ -25,70 +85,50 @@ export default function LoginPage() {
             The central hub for your club.
           </p>
         </div>
-        <Tabs defaultValue="login" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">Log In</TabsTrigger>
-            <TabsTrigger value="register">Register</TabsTrigger>
-          </TabsList>
-          <TabsContent value="login">
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-headline">Club Login</CardTitle>
-                <CardDescription>
-                  Enter your credentials to access your club dashboard.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" placeholder="admin@myclub.com" />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <Label htmlFor="password">Password</Label>
-                    <Link
-                      href="#"
-                      className="ml-auto inline-block text-sm underline"
-                    >
-                      Forgot your password?
-                    </Link>
-                  </div>
-                  <Input id="password" type="password" />
-                </div>
-                <Button type="submit" className="w-full" asChild>
-                  <Link href="/home">Log in</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="register">
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-headline">Register New Club</CardTitle>
-                <CardDescription>
-                  Create an account for your club to get started.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="club-name">Club Name</Label>
-                  <Input id="club-name" placeholder="My Awesome Club" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="admin-email">Admin Email</Label>
-                  <Input id="admin-email" type="email" placeholder="you@example.com" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="register-password">Password</Label>
-                  <Input id="register-password" type="password" />
-                </div>
-                <Button type="submit" className="w-full" asChild>
-                  <Link href="/home">Register</Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-headline">Club Login</CardTitle>
+            <CardDescription>
+              Enter your credentials to access your club dashboard.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="admin@myclub.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              {error && (
+                 <Alert variant="destructive">
+                  <AlertTitle>Login Failed</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Loading...' : 'Log in'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
