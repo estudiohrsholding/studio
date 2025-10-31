@@ -202,13 +202,13 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
         ...newItemData,
         isMembership: true,
         duration: membershipTimeUnit,
-        stockLevel: 0, // Memberships don't have stock
       };
     } else {
       newItemData = {
         ...newItemData,
         isMembership: false,
         stockLevel: Number(stock),
+        duration: undefined,
       };
     }
 
@@ -293,16 +293,22 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
     const [category, setCategory] = useState('');
     const [minSaleUnit, setMinSaleUnit] = useState('');
     const [price, setPrice] = useState('');
+    const [duration, setDuration] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const clubId = useAuthStore((state) => state.clubId);
+
+    const isMembershipGroup = useMemo(() => item?.isMembership || group.trim().toLowerCase() === 'membresías', [item, group]);
 
     useEffect(() => {
         if (item) {
             setName(item.name);
             setGroup(item.group);
             setCategory(item.category);
-            setMinSaleUnit(String(item.minimumUnitOfSale));
+            setMinSaleUnit(String(item.minimumUnitOfSale || ''));
             setPrice(String(item.amountPerUnit));
+            if (item.isMembership) {
+                setDuration(item.duration || '');
+            }
         }
     }, [item]);
 
@@ -311,13 +317,23 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
         if (!item || !clubId) return;
 
         setIsLoading(true);
-        const updatedData = {
+        
+        let updatedData: any = {
             name,
             group,
             category,
             minimumUnitOfSale: Number(minSaleUnit),
             amountPerUnit: Number(price),
         };
+
+        if (isMembershipGroup) {
+            updatedData.duration = duration;
+            updatedData.stockLevel = undefined; 
+            updatedData.isMembership = true;
+        } else {
+            updatedData.duration = undefined;
+            // Note: We don't update stockLevel here as it's handled by RefillDialog
+        }
 
         try {
             const db = getFirestore();
@@ -354,12 +370,18 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="edit-min-unit" className="text-right">Min. Sale Unit</Label>
-                            <Input id="edit-min-unit" type="number" step="0.1" value={minSaleUnit} onChange={(e) => setMinSaleUnit(e.target.value)} className="col-span-3" required />
+                            <Input id="edit-min-unit" type="number" step="0.1" value={minSaleUnit} onChange={(e) => setMinSaleUnit(e.target.value)} className="col-span-3" disabled={isMembershipGroup} />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="edit-price" className="text-right">Price (€)</Label>
                             <Input id="edit-price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="col-span-3" required />
                         </div>
+                         {isMembershipGroup && (
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit-duration" className="text-right">Duration</Label>
+                                <Input id="edit-duration" value={duration} onChange={(e) => setDuration(e.target.value)} className="col-span-3" required />
+                            </div>
+                        )}
                     </div>
                     <DialogFooter>
                         <Button type="submit" disabled={isLoading}>{isLoading ? 'Saving...' : 'Save Changes'}</Button>
@@ -387,7 +409,6 @@ export default function InventoryPage() {
     const [isLoading, setIsLoading] = useState(true);
     const clubId = useAuthStore((state) => state.clubId);
     
-    // --- Selection State ---
     const [selectedItems, setSelectedItems] = useState(new Set<string>());
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [itemToEdit, setItemToEdit] = useState<Item | null>(null);
@@ -419,7 +440,6 @@ export default function InventoryPage() {
       return () => unsubscribe();
     }, [clubId]);
 
-    // --- Selection Logic ---
     const handleToggleSelect = (itemId: string) => {
         setSelectedItems(prev => {
             const newSet = new Set(prev);
