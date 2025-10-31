@@ -78,7 +78,7 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     console.log('%c[DEBUG] 1. handleSubmit: Triggered.', 'color: #00FF00');
-
+  
     // Get all states
     const clubId = useAuthStore.getState().clubId;
     const data = {
@@ -86,11 +86,11 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
       email, // from form state
       idPhoto, // from file state
     };
-
+  
     console.log('[DEBUG] 2. Validating input...', { clubId, ...data });
     setIsLoading(true); // Button now says "Saving..."
     setError(null);
-
+  
     // --- Guard Clauses ---
     if (!clubId) {
       console.error('%c[DEBUG] 3. FAILURE: clubId is null.', 'color: #FF0000');
@@ -104,7 +104,7 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
       setIsLoading(false);
       return;
     }
-
+  
     try {
       // --- STEP 1: UPLOAD FILE ---
       console.log('[DEBUG] 4. Creating Storage reference...');
@@ -112,16 +112,16 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
       const uniqueFileName = `${uuidv4()}-${data.idPhoto.name}`;
       const storageRef = ref(storage, `clubs/${clubId}/member_ids/${uniqueFileName}`);
       console.log('%c[DEBUG] 5. Storage Path:', 'color: #00FFFF', storageRef.path);
-
+  
       console.log('[DEBUG] 6. Awaiting uploadBytes()...');
       await uploadBytes(storageRef, data.idPhoto);
       console.log('%c[DEBUG] 7. SUCCESS: File Uploaded.', 'color: #00FF00');
-
+  
       // --- STEP 2: GET URL ---
       console.log('[DEBUG] 8. Awaiting getDownloadURL()...');
       const downloadURL = await getDownloadURL(storageRef);
       console.log('%c[DEBUG] 9. SUCCESS: Got URL:', 'color: #00FF00', downloadURL);
-
+  
       // --- STEP 3: WRITE DOCUMENT ---
       const newMemberData = {
         name: data.fullName,
@@ -132,21 +132,21 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
         avatar: `https://picsum.photos/seed/${uuidv4()}/200/200`, // Match existing schema
       };
       console.log('[DEBUG] 10. Built Firestore object:', newMemberData);
-
+  
       const db = getFirestore();
       const membersColRef = collection(db, 'clubs', clubId, 'members');
       console.log('[DEBUG] 11. Awaiting addDoc()...');
       await addDoc(membersColRef, newMemberData);
       console.log('%c[DEBUG] 12. SUCCESS: Doc written to Firestore.', 'color: #00FF00');
-
+  
       console.log('[DEBUG] 13. Calling onMemberAdded()...');
       onMemberAdded(); // Close the modal
-
+  
     } catch (error: any) {
       console.error('%c[DEBUG] 14. CRITICAL FAILURE in try block:', 'color: #FF0000', error.code, error.message);
       console.error(error);
-      if (error.code === 'storage/unauthorized' || error.message.includes('CORS')) {
-        setError("File upload failed due to a permissions issue. This is likely a cloud configuration problem. Please ensure Firebase Storage is enabled and CORS has been configured correctly for your bucket.");
+      if (error.code === 'storage/unauthorized' || error.code === 'storage/object-not-found' || error.message.includes('CORS')) {
+        setError("File upload failed. This is likely due to a permissions issue with Firebase Storage. Please ensure your storage bucket exists and that the CORS policy has been correctly configured for your environment.");
       } else {
         setError(`An unexpected error occurred: ${error.message}`);
       }
