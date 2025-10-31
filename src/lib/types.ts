@@ -41,5 +41,3 @@ export type Transaction = {
   date: string;
   user: string;
 };
-
-    

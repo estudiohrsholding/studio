@@ -1,6 +1,6 @@
 'use client';
 
-import { PlusCircle, Trash2, X } from 'lucide-react';
+import { PlusCircle, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -33,9 +33,6 @@ import {
   orderBy,
   limit,
   where,
-  writeBatch,
-  doc,
-  serverTimestamp,
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -52,6 +49,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { ChevronsUpDown } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface CartItem extends Item {
   quantity: number;
@@ -70,6 +68,7 @@ export default function POSPage() {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [quantity, setQuantity] = useState<string>('1');
   const [amount, setAmount] = useState<string>('');
+  const [formError, setFormError] = useState<string | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const clubId = useAuthStore((state) => state.clubId);
@@ -146,9 +145,23 @@ export default function POSPage() {
     return () => unsubscribe();
   }, [clubId, itemSearchTerm, db]);
 
+  const isIntegerOnly = selectedItem ? Number.isInteger(selectedItem.minimumUnitOfSale) : false;
+
   const handleQuantityChange = (newQuantity: string) => {
+    if (isIntegerOnly && newQuantity.includes('.') && newQuantity.split('.')[1] !== '') {
+      setFormError('This item only accepts whole units.');
+      // We still update the quantity to show the invalid input, but the error will be visible
+      setQuantity(newQuantity);
+      return; 
+    }
+    
+    setFormError(null);
     setQuantity(newQuantity);
-    if (!selectedItem || !selectedItem.amountPerUnit) return;
+
+    if (!selectedItem || !selectedItem.amountPerUnit) {
+      setAmount('');
+      return;
+    }
 
     const q = parseFloat(newQuantity);
     if (isNaN(q)) {
@@ -161,18 +174,34 @@ export default function POSPage() {
   
   const handleAmountChange = (newAmount: string) => {
     setAmount(newAmount);
-    if (!selectedItem || !selectedItem.amountPerUnit || selectedItem.amountPerUnit === 0) return;
+    setFormError(null);
+
+    if (!selectedItem || !selectedItem.amountPerUnit || selectedItem.amountPerUnit === 0) {
+      setQuantity('');
+      return;
+    }
 
     const a = parseFloat(newAmount);
     if (isNaN(a)) {
       setQuantity('');
       return;
     }
+
     const newQuantity = a / selectedItem.amountPerUnit;
-    setQuantity(newQuantity.toFixed(2));
+
+    if (isIntegerOnly) {
+      const roundedQuantity = Math.round(newQuantity);
+      setQuantity(roundedQuantity.toString());
+      const finalAmount = roundedQuantity * selectedItem.amountPerUnit;
+      setAmount(finalAmount.toFixed(2));
+    } else {
+      setQuantity(newQuantity.toFixed(2));
+    }
   };
 
+
   const handleAddToCart = () => {
+    if (formError) return;
     const numericQuantity = parseFloat(quantity);
     if (!selectedItem || isNaN(numericQuantity) || numericQuantity <= 0) return;
   
@@ -192,6 +221,7 @@ export default function POSPage() {
     setQuantity('1');
     setAmount('');
     setItemSearchTerm('');
+    setFormError(null);
   };
 
   const handleRemoveFromCart = (itemId: string) => {
@@ -289,6 +319,7 @@ export default function POSPage() {
                             role="combobox"
                             aria-expanded={itemSelectOpen}
                             className="w-full justify-between"
+                            disabled={!selectedMember}
                           >
                             {selectedItem
                               ? selectedItem.name
@@ -342,6 +373,8 @@ export default function POSPage() {
                         value={quantity}
                         onChange={(e) => handleQuantityChange(e.target.value)}
                         min="0"
+                        step={isIntegerOnly ? '1' : '0.01'}
+                        disabled={!selectedItem}
                       />
                     </div>
                     <div className="sm:col-span-1">
@@ -355,12 +388,18 @@ export default function POSPage() {
                         value={amount}
                         onChange={(e) => handleAmountChange(e.target.value)}
                         min="0"
+                        disabled={!selectedItem}
                       />
                     </div>
-                    <Button variant="outline" size="icon" onClick={handleAddToCart} className="sm:col-span-1">
+                    <Button variant="outline" size="icon" onClick={handleAddToCart} className="sm:col-span-1" disabled={!selectedItem || !!formError}>
                       <PlusCircle className="h-4 w-4" />
                     </Button>
                   </div>
+                   {formError && (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertDescription>{formError}</AlertDescription>
+                    </Alert>
+                  )}
                 </div>
               </CardContent>
             </Card>
