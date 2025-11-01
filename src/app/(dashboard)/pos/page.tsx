@@ -97,16 +97,23 @@ export default function POSPage() {
     setMembersLoading(true);
 
     const membersRef = collection(db, 'clubs', clubId, 'members');
-    let q;
+    
+    // Base query with filtering for non-vetoed members
+    let q = query(
+      membersRef,
+      where('isVetoed', '==', false),
+      orderBy('name'),
+      limit(10)
+    );
+
     if (memberSearchTerm) {
       q = query(
         membersRef,
+        where('isVetoed', '==', false),
         where('name', '>=', memberSearchTerm),
         where('name', '<=', memberSearchTerm + '\uf8ff'),
         limit(10)
       );
-    } else {
-      q = query(membersRef, orderBy('name'), limit(10));
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -127,6 +134,8 @@ export default function POSPage() {
     const itemsRef = collection(db, 'clubs', clubId, 'inventoryItems');
     let q;
 
+    // ROOT CAUSE FIX: The where('stockLevel', '>', 0) clause was incorrectly filtering out
+    // all membership items and all out-of-stock items. It has been removed.
     if (itemSearchTerm) {
       q = query(
         itemsRef,
