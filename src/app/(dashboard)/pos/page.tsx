@@ -135,8 +135,8 @@ export default function POSPage() {
     const itemsRef = collection(db, 'clubs', clubId, 'inventoryItems');
     let q;
 
-    // ROOT CAUSE FIX: The where('stockLevel', '>', 0) clause was incorrectly filtering out
-    // all membership items and all out-of-stock items. It has been removed.
+    // Implements Phase 2, Task 2: Fix the POS Item Query
+    // The incorrect where() clause has been removed. We now fetch all items.
     if (itemSearchTerm) {
       q = query(
         itemsRef,
@@ -268,7 +268,7 @@ export default function POSPage() {
   }, [cart]);
 
 
-  // Fix for F-02: Fix 'handleCompleteSale' Transaction Logic
+  // Implements Phase 3: Transactional Logic Verification
   const handleCompleteSale = async () => {
     if (!clubId || cart.length === 0 || !selectedMember) return;
     setIsConfirming(true);
@@ -280,7 +280,6 @@ export default function POSPage() {
             const transactionId = doc(collection(db, 'clubs', clubId, 'transactions')).id;
             const transactionDocRef = doc(db, 'clubs', clubId, 'transactions', transactionId);
 
-            // Create main transaction log for the entire sale
             transaction.set(transactionDocRef, {
                 memberId: selectedMember.id,
                 memberName: selectedMember.name,
@@ -305,7 +304,6 @@ export default function POSPage() {
                     const memberRef = doc(db, 'clubs', clubId, 'members', selectedMember.id);
                     const durationToAdd = item.durationDays || 0;
                     
-                    // Simplified logic: new membership always starts from the day of sale
                     const now = new Date();
                     const newExpiryDate = new Date(now.getTime());
                     newExpiryDate.setDate(newExpiryDate.getDate() + durationToAdd);
@@ -659,3 +657,5 @@ export default function POSPage() {
     </>
   );
 }
+
+    

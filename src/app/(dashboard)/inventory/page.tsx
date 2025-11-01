@@ -168,7 +168,8 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
   const [isLoading, setIsLoading] = useState(false);
   const { firestore } = useFirebase();
 
-  const isMembershipGroup = group.trim().toLowerCase() === 'membresías';
+  // Implements Phase 2, Task 2: Automate 'isMembership' flag
+  const isMembershipItem = name.toLowerCase().includes('membresía');
 
   const resetForm = () => {
     setName('');
@@ -191,20 +192,20 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
       return;
     }
 
-    let newItemData: any = {
+    // Implements Phase 2, Task 2: Automate 'isMembership' flag on create
+    let newItemData: Partial<Item> = {
       name: name,
       group: group,
       category: category,
       amountPerUnit: Number(price),
       createdAt: serverTimestamp(),
       clubId: clubId,
+      isMembership: isMembershipItem,
     };
     
-    // Fix for F-02: Enforce correct data model on creation
-    if (isMembershipGroup) {
+    if (isMembershipItem) {
       newItemData = {
         ...newItemData,
-        isMembership: true,
         durationDays: Number(durationDays),
         minimumUnitOfSale: 1,
         stockLevel: null,
@@ -212,7 +213,6 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
     } else {
       newItemData = {
         ...newItemData,
-        isMembership: false,
         stockLevel: Number(stock),
         minimumUnitOfSale: Number(minSaleUnit) || 1,
         durationDays: null,
@@ -255,11 +255,11 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="name" className="text-right">Name</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" required />
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" placeholder="e.g. Membresía Anual" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="group" className="text-right">Group</Label>
-              <Input id="group" value={group} onChange={(e) => setGroup(e.target.value)} className="col-span-3" placeholder="e.g., Flowers, Edibles, Membresías" required />
+              <Input id="group" value={group} onChange={(e) => setGroup(e.target.value)} className="col-span-3" required />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="category" className="text-right">Category</Label>
@@ -269,7 +269,7 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
               <Label htmlFor="price" className="text-right">Price (€)</Label>
               <Input id="price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="col-span-3" required />
             </div>
-            {isMembershipGroup ? (
+            {isMembershipItem ? (
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="duration" className="text-right">Duration (Days)</Label>
                 <Input id="duration" type="number" value={durationDays} onChange={(e) => setDurationDays(e.target.value)} placeholder="e.g., 365" className="col-span-3" required />
@@ -304,11 +304,11 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
     const [minSaleUnit, setMinSaleUnit] = useState('');
     const [price, setPrice] = useState('');
     const [durationDays, setDurationDays] = useState('');
-    const [stock, setStock] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const clubId = useAuthStore((state) => state.clubId);
 
-    const isMembership = useMemo(() => item?.group.toLowerCase() === 'membresías', [item]);
+    // Implements Phase 2, Task 2: Automate 'isMembership' flag
+    const isMembership = useMemo(() => name.toLowerCase().includes('membresía'), [name]);
 
     useEffect(() => {
         if (item) {
@@ -316,14 +316,11 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
             setGroup(item.group);
             setCategory(item.category);
             setPrice(String(item.amountPerUnit));
-            // Fix for F-02: Correctly load either duration or stock
             if (item.isMembership) {
                 setDurationDays(String(item.durationDays || ''));
                 setMinSaleUnit('');
-                setStock('');
             } else {
                 setMinSaleUnit(String(item.minimumUnitOfSale || ''));
-                setStock(String(item.stockLevel || ''));
                 setDurationDays('');
             }
         }
@@ -335,24 +332,23 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
 
         setIsLoading(true);
         
-        let updatedData: any = {
+        // Implements Phase 2, Task 2: Automate 'isMembership' flag on edit
+        let updatedData: Partial<Item> = {
             name,
             group,
             category,
             amountPerUnit: Number(price),
+            isMembership: isMembership,
         };
 
-        // Fix for F-02: Enforce correct data model on update
         if (isMembership) {
-            updatedData.isMembership = true;
             updatedData.durationDays = Number(durationDays);
             updatedData.minimumUnitOfSale = 1;
-            updatedData.stockLevel = null; // Explicitly set stock to null
+            updatedData.stockLevel = null;
         } else {
-            updatedData.isMembership = false;
             updatedData.minimumUnitOfSale = Number(minSaleUnit);
-            // We don't update stockLevel here on purpose. It's handled by Refill.
-            updatedData.durationDays = null; // Explicitly set duration to null
+            updatedData.durationDays = null;
+            // Note: stockLevel is not updated here, it's handled via Refill dialog.
         }
 
         try {
@@ -382,7 +378,7 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="edit-group" className="text-right">Group</Label>
-                            <Input id="edit-group" value={group} onChange={(e) => setGroup(e.target.value)} className="col-span-3" required readOnly />
+                            <Input id="edit-group" value={group} onChange={(e) => setGroup(e.target.value)} className="col-span-3" required />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="edit-category" className="text-right">Category</Label>
@@ -392,20 +388,16 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
                             <Label htmlFor="edit-price" className="text-right">Price (€)</Label>
                             <Input id="edit-price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="col-span-3" required />
                         </div>
-                         {/* Fix for F-02: Conditional input rendering */}
                          {isMembership ? (
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="edit-duration" className="text-right">Duration (Days)</Label>
                                 <Input id="edit-duration" type="number" value={durationDays} onChange={(e) => setDurationDays(e.target.value)} className="col-span-3" required />
                             </div>
                         ) : (
-                            <>
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="edit-min-unit" className="text-right">Min. Sale Unit</Label>
-                                    <Input id="edit-min-unit" type="number" step="0.1" value={minSaleUnit} onChange={(e) => setMinSaleUnit(e.target.value)} className="col-span-3" />
-                                </div>
-                                {/* Stock level is not editable here, only through Refill dialog */}
-                            </>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit-min-unit" className="text-right">Min. Sale Unit</Label>
+                                <Input id="edit-min-unit" type="number" step="0.1" value={minSaleUnit} onChange={(e) => setMinSaleUnit(e.target.value)} className="col-span-3" />
+                            </div>
                         )}
                     </div>
                     <DialogFooter>
@@ -647,7 +639,6 @@ export default function InventoryPage() {
                                             </TableCell>
                                             <TableCell><Badge variant="secondary">{item.category}</Badge></TableCell>
                                             <TableCell>€{(item.amountPerUnit || 0).toFixed(2)}</TableCell>
-                                            {/* Fix for F-02 / Phase 2, Task 3: Enforce Conditional UI Rendering */}
                                             <TableCell>
                                                 {item.isMembership ? (
                                                     <span className="font-medium">{item.durationDays ? `${item.durationDays} days` : 'Temporal'}</span>
@@ -728,3 +719,5 @@ export default function InventoryPage() {
     </>
   );
 }
+
+    
