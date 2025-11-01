@@ -1,3 +1,4 @@
+
 // Implements Phase 2, Task 2: Create Derived State Function 'getMemberStatus'
 import { Timestamp } from 'firebase/firestore';
 
@@ -18,7 +19,7 @@ export function getMemberStatus(
     const expirationDate = expiresAt.toDate();
 
     if (expirationDate > now) {
-        return { text: 'activated', color: 'text-green-500' };
+        return { text: 'activated', color: 'bg-green-700 text-green-50' };
     } else {
         return { text: 'EXPIRED', color: 'text-gray-400' };
     }
