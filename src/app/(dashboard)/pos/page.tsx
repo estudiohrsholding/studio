@@ -135,8 +135,6 @@ export default function POSPage() {
     const itemsRef = collection(db, 'clubs', clubId, 'inventoryItems');
     let q;
 
-    // Implements Phase 2, Task 2: Fix the POS Item Query
-    // The incorrect where() clause has been removed. We now fetch all items.
     if (itemSearchTerm) {
       q = query(
         itemsRef,
@@ -657,5 +655,4 @@ export default function POSPage() {
     </>
   );
 }
-
     
