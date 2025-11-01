@@ -115,10 +115,13 @@ function RefillDialog({ item }: { item: Item }) {
         }
     }}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={item.isMembership}>
-          <Plus className="h-4 w-4" />
-          <span className="sr-only">Refill</span>
-        </Button>
+        {/* Implements Phase 2, Task 3: Hide restock button for memberships */}
+        {!item.isMembership && (
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Plus className="h-4 w-4" />
+            <span className="sr-only">Refill</span>
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
@@ -305,7 +308,7 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
     const [isLoading, setIsLoading] = useState(false);
     const clubId = useAuthStore((state) => state.clubId);
 
-    const isMembership = useMemo(() => item?.isMembership, [item]);
+    const isMembership = useMemo(() => item?.group.toLowerCase() === 'membresías', [item]);
 
     useEffect(() => {
         if (item) {
@@ -644,10 +647,10 @@ export default function InventoryPage() {
                                             </TableCell>
                                             <TableCell><Badge variant="secondary">{item.category}</Badge></TableCell>
                                             <TableCell>€{(item.amountPerUnit || 0).toFixed(2)}</TableCell>
-                                            {/* Fix for F-02: Enforce Conditional UI Rendering */}
+                                            {/* Fix for F-02 / Phase 2, Task 3: Enforce Conditional UI Rendering */}
                                             <TableCell>
                                                 {item.isMembership ? (
-                                                    <span className="font-medium">{item.durationDays} days</span>
+                                                    <span className="font-medium">{item.durationDays ? `${item.durationDays} days` : 'Temporal'}</span>
                                                 ) : (
                                                     <span className={(item.stockLevel || 0) < 15 ? 'text-destructive font-medium' : ''}>
                                                         {item.stockLevel} units
@@ -725,5 +728,3 @@ export default function InventoryPage() {
     </>
   );
 }
-
-    

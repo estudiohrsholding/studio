@@ -269,7 +269,7 @@ export default function POSPage() {
             const transactionId = doc(collection(db, 'clubs', clubId, 'transactions')).id;
             const transactionDocRef = doc(db, 'clubs', clubId, 'transactions', transactionId);
 
-            // Create main transaction log
+            // Create main transaction log for the entire sale
             transaction.set(transactionDocRef, {
                 memberId: selectedMember.id,
                 memberName: selectedMember.name,
@@ -287,7 +287,10 @@ export default function POSPage() {
             });
             
             for (const item of cart) {
+                // This is the CRITICAL BIFURCATION LOGIC
                 if (item.isMembership) {
+                    // --- MEMBERSHIP LOGIC (NO STOCK) ---
+                    console.log(`Processing TEMPORAL item: ${item.name}`);
                     const memberRef = doc(db, 'clubs', clubId, 'members', selectedMember.id);
                     const durationToAdd = item.durationDays || 0;
                     
@@ -299,11 +302,12 @@ export default function POSPage() {
                     transaction.update(memberRef, { 
                         membershipExpiresAt: Timestamp.fromDate(newExpiryDate) 
                     });
-
                 } else {
-                    // Standard item logic: decrement stock
+                    // --- STOCKABLE ITEM LOGIC ---
+                    console.log(`Processing STOCKABLE item: ${item.name}`);
                     const itemDocRef = doc(db, 'clubs', clubId, 'inventoryItems', item.id);
                     const itemDoc = await transaction.get(itemDocRef);
+
                     if (!itemDoc.exists() || (itemDoc.data().stockLevel || 0) < item.quantity) {
                         throw new Error(`Not enough stock for ${item.name}.`);
                     }
@@ -327,6 +331,7 @@ export default function POSPage() {
             }
         });
 
+        console.log("Transaction successfully committed!");
         setShowConfirmation(true);
 
     } catch (error: any) {
@@ -643,5 +648,3 @@ export default function POSPage() {
     </>
   );
 }
-
-    

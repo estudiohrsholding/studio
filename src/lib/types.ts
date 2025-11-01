@@ -35,6 +35,7 @@ export type Item = {
   amountPerUnit: number;
   imageUrl?: string;
   imageHint?: string;
+  createdAt?: Timestamp;
   // Polymorphic fields
   isMembership?: boolean;
   durationDays?: number | null;
@@ -53,5 +54,3 @@ export type Transaction = {
   date: string;
   user: string;
 };
-
-    
