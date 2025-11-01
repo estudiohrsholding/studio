@@ -98,8 +98,6 @@ export default function POSPage() {
 
     const membersRef = collection(db, 'clubs', clubId, 'members');
     
-    // FIX: Removed the where('isVetoed', '==', false) clause to prevent composite index requirement.
-    // Vetoed members will be filtered on the client-side.
     let q = query(
       membersRef,
       orderBy('name'),
@@ -120,7 +118,6 @@ export default function POSPage() {
       const fetchedMembers = snapshot.docs.map(
         (doc) => ({ id: doc.id, ...doc.data() } as Member)
       );
-      // FIX: Filter for non-vetoed members on the client side.
       setMemberResults(fetchedMembers.filter(member => !member.isVetoed));
       setMembersLoading(false);
     });
@@ -136,20 +133,16 @@ useEffect(() => {
   let q;
 
   if (itemSearchTerm) {
-    // FIX: 'limit(10)' ELIMINADO de la búsqueda
     q = query(
       itemsRef,
       orderBy('name'),
       where('name', '>=', itemSearchTerm),
       where('name', '<=', itemSearchTerm + '\uf8ff')
-      // limit(10) <-- ELIMINADO
     );
   } else {
-    // FIX: 'limit(10)' ELIMINADO de la lista por defecto
     q = query(
       itemsRef, 
       orderBy('name')
-      // limit(10) <-- ELIMINADO
     );
   }
 
@@ -272,7 +265,6 @@ useEffect(() => {
   }, [cart]);
 
 
-  // Implements Phase 3: Transactional Logic Verification
   const handleCompleteSale = async () => {
     if (!clubId || cart.length === 0 || !selectedMember) return;
     setIsConfirming(true);
@@ -280,10 +272,28 @@ useEffect(() => {
     const db = getFirestore();
     
     try {
+        // Fix for P-02: Re-architected transaction logic
         await runTransaction(db, async (transaction) => {
+            // --- PHASE A: READS & VALIDATION ---
+            const stockableItemsInCart = cart.filter(item => !item.isMembership);
+            const itemRefs = stockableItemsInCart.map(item => doc(db, 'clubs', clubId, 'inventoryItems', item.id));
+
+            if (itemRefs.length > 0) {
+                const itemDocs = await Promise.all(itemRefs.map(ref => transaction.get(ref)));
+    
+                for (let i = 0; i < stockableItemsInCart.length; i++) {
+                    const itemDoc = itemDocs[i];
+                    const cartItem = stockableItemsInCart[i];
+                    if (!itemDoc.exists() || (itemDoc.data().stockLevel || 0) < cartItem.quantity) {
+                        throw new Error(`Not enough stock for ${cartItem.name}.`);
+                    }
+                }
+            }
+
+            // --- PHASE B: WRITES ---
+            // Write 1: Main transaction log
             const transactionId = doc(collection(db, 'clubs', clubId, 'transactions')).id;
             const transactionDocRef = doc(db, 'clubs', clubId, 'transactions', transactionId);
-
             transaction.set(transactionDocRef, {
                 memberId: selectedMember.id,
                 memberName: selectedMember.name,
@@ -299,12 +309,11 @@ useEffect(() => {
                 type: 'dispense',
                 clubId: clubId
             });
-            
+
+            // Write 2: Loop through cart again for individual updates
             for (const item of cart) {
-                // This is the CRITICAL BIFURCATION LOGIC
                 if (item.isMembership) {
-                    // --- MEMBERSHIP LOGIC (NO STOCK) ---
-                    console.log(`Processing TEMPORAL item: ${item.name}`);
+                    // Update member's expiration date
                     const memberRef = doc(db, 'clubs', clubId, 'members', selectedMember.id);
                     const durationToAdd = item.durationDays || 0;
                     
@@ -316,18 +325,12 @@ useEffect(() => {
                         membershipExpiresAt: Timestamp.fromDate(newExpiryDate) 
                     });
                 } else {
-                    // --- STOCKABLE ITEM LOGIC ---
-                    console.log(`Processing STOCKABLE item: ${item.name}`);
+                    // Decrement stock for stockable items
                     const itemDocRef = doc(db, 'clubs', clubId, 'inventoryItems', item.id);
-                    const itemDoc = await transaction.get(itemDocRef);
-
-                    if (!itemDoc.exists() || (itemDoc.data().stockLevel || 0) < item.quantity) {
-                        throw new Error(`Not enough stock for ${item.name}.`);
-                    }
                     transaction.update(itemDocRef, { stockLevel: increment(-item.quantity) });
                 }
 
-                // Create universal audit log for each item in the sale
+                // Write 3: Create universal audit log for each item
                 const logDocRef = doc(collection(db, 'clubs', clubId, 'transactions'));
                 transaction.set(logDocRef, { 
                     type: 'dispense-log', 
@@ -352,7 +355,7 @@ useEffect(() => {
         toast({
             variant: "destructive",
             title: "Sale Failed",
-            description: "Could not complete the sale. Inventory may not have been changed. Error: " + error.message,
+            description: "Could not complete the sale. Inventory may have been changed. Error: " + error.message,
         });
     } finally {
         setIsConfirming(false);
