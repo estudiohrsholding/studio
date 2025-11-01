@@ -1,4 +1,3 @@
-
 'use client';
 
 import { PlusCircle, Trash2 } from 'lucide-react';
@@ -86,7 +85,7 @@ export default function POSPage() {
   // --- Inventory Search State & Logic ---
   const [itemSearchTerm, setItemSearchTerm] = useState('');
   const [itemResults, setItemResults] = useState<Item[]>([]);
-  const [itemsLoading, setItemsLoading] useState(true);
+  const [itemsLoading, setItemsLoading] = useState(true);
   const [itemSelectOpen, setItemSelectOpen] = useState(false);
 
   const db = getFirestore();
@@ -648,5 +647,3 @@ export default function POSPage() {
     </>
   );
 }
-
-    
