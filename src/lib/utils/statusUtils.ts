@@ -1,4 +1,3 @@
-
 // Implements Phase 2, Task 2: Create Derived State Function 'getMemberStatus'
 import { Timestamp } from 'firebase/firestore';
 
