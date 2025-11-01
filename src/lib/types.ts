@@ -1,5 +1,5 @@
 
-import { Timestamp } from "firebase/firestore";
+import { FieldValue, Timestamp } from "firebase/firestore";
 
 export type User = {
   id: string;
@@ -35,7 +35,7 @@ export type Item = {
   amountPerUnit: number;
   imageUrl?: string;
   imageHint?: string;
-  createdAt?: Timestamp;
+  createdAt?: Timestamp | FieldValue;
   // Polymorphic fields
   isMembership?: boolean;
   durationDays?: number | null;
