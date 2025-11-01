@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { mockUser } from '@/lib/data';
-import { PlusCircle, UserPlus } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 import { RewardsPanel } from '@/components/dashboard/profile/rewards-panel';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
