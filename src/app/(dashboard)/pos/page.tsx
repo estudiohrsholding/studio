@@ -656,3 +656,5 @@ export default function POSPage() {
           </DialogContent>
         </Dialog>
     </>
+  );
+}
