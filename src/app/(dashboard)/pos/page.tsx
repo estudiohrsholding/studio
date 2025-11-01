@@ -98,10 +98,10 @@ export default function POSPage() {
 
     const membersRef = collection(db, 'clubs', clubId, 'members');
     
-    // Base query with filtering for non-vetoed members
+    // FIX: Removed the where('isVetoed', '==', false) clause to prevent composite index requirement.
+    // Vetoed members will be filtered on the client-side.
     let q = query(
       membersRef,
-      where('isVetoed', '==', false),
       orderBy('name'),
       limit(10)
     );
@@ -109,9 +109,9 @@ export default function POSPage() {
     if (memberSearchTerm) {
       q = query(
         membersRef,
-        where('isVetoed', '==', false),
         where('name', '>=', memberSearchTerm),
         where('name', '<=', memberSearchTerm + '\uf8ff'),
+        orderBy('name'),
         limit(10)
       );
     }
@@ -120,7 +120,8 @@ export default function POSPage() {
       const fetchedMembers = snapshot.docs.map(
         (doc) => ({ id: doc.id, ...doc.data() } as Member)
       );
-      setMemberResults(fetchedMembers);
+      // FIX: Filter for non-vetoed members on the client side.
+      setMemberResults(fetchedMembers.filter(member => !member.isVetoed));
       setMembersLoading(false);
     });
 
@@ -655,5 +656,3 @@ export default function POSPage() {
           </DialogContent>
         </Dialog>
     </>
-  );
-}
