@@ -1,3 +1,4 @@
+
 'use client';
 
 import { PlusCircle, Trash2 } from 'lucide-react';
@@ -256,81 +257,76 @@ export default function POSPage() {
   }, [cart]);
 
 
-  // Implements Phase 2, Task 4: Membership Sale Transaction Logic
+  // Fix for F-02: Fix 'handleCompleteSale' Transaction Logic
   const handleCompleteSale = async () => {
     if (!clubId || cart.length === 0 || !selectedMember) return;
     setIsConfirming(true);
 
     const db = getFirestore();
-    const batch = writeBatch(db);
-
+    
     try {
-        const transactionDocRef = doc(collection(db, 'clubs', clubId, 'transactions'));
-        batch.set(transactionDocRef, {
-            memberId: selectedMember.id,
-            memberName: selectedMember.name,
-            cart: cart.map(item => ({ 
-                itemId: item.id, 
-                name: item.name, 
-                quantity: item.quantity, 
-                amount: (item.amountPerUnit || 0) * item.quantity 
-            })),
-            totalAmount: total,
-            dispensedBy: mockUser.name,
-            transactionDate: serverTimestamp(),
-            type: 'dispense',
-            clubId: clubId
-        });
-        
-        for (const item of cart) {
-            if (item.isMembership) {
-                const memberRef = doc(db, 'clubs', clubId, 'members', selectedMember.id);
-                const durationToAdd = item.durationDays || 0;
+        await runTransaction(db, async (transaction) => {
+            const transactionId = doc(collection(db, 'clubs', clubId, 'transactions')).id;
+            const transactionDocRef = doc(db, 'clubs', clubId, 'transactions', transactionId);
 
-                // Using a Firestore Transaction for the read-modify-write operation
-                await runTransaction(db, async (transaction) => {
-                    const memberDoc = await transaction.get(memberRef);
-                    if (!memberDoc.exists()) {
-                        throw "Member document not found!";
-                    }
-
-                    const currentExpiry = memberDoc.data().membershipExpiresAt?.toDate() || null;
+            // Create main transaction log
+            transaction.set(transactionDocRef, {
+                memberId: selectedMember.id,
+                memberName: selectedMember.name,
+                cart: cart.map(item => ({ 
+                    itemId: item.id, 
+                    name: item.name, 
+                    quantity: item.quantity, 
+                    amount: (item.amountPerUnit || 0) * item.quantity 
+                })),
+                totalAmount: total,
+                dispensedBy: mockUser.name,
+                transactionDate: serverTimestamp(),
+                type: 'dispense',
+                clubId: clubId
+            });
+            
+            for (const item of cart) {
+                if (item.isMembership) {
+                    const memberRef = doc(db, 'clubs', clubId, 'members', selectedMember.id);
+                    const durationToAdd = item.durationDays || 0;
+                    
+                    // Simplified logic: new membership always starts from the day of sale
                     const now = new Date();
-                    
-                    // Stack new membership onto active ones, otherwise start from today
-                    const baseDate = (currentExpiry && currentExpiry > now) ? currentExpiry : now;
-                    
-                    const newExpiryDate = new Date(baseDate.getTime());
+                    const newExpiryDate = new Date(now.getTime());
                     newExpiryDate.setDate(newExpiryDate.getDate() + durationToAdd);
 
                     transaction.update(memberRef, { 
                         membershipExpiresAt: Timestamp.fromDate(newExpiryDate) 
                     });
+
+                } else {
+                    // Standard item logic: decrement stock
+                    const itemDocRef = doc(db, 'clubs', clubId, 'inventoryItems', item.id);
+                    const itemDoc = await transaction.get(itemDocRef);
+                    if (!itemDoc.exists() || (itemDoc.data().stockLevel || 0) < item.quantity) {
+                        throw new Error(`Not enough stock for ${item.name}.`);
+                    }
+                    transaction.update(itemDocRef, { stockLevel: increment(-item.quantity) });
+                }
+
+                // Create universal audit log for each item in the sale
+                const logDocRef = doc(collection(db, 'clubs', clubId, 'transactions'));
+                transaction.set(logDocRef, { 
+                    type: 'dispense-log', 
+                    transactionDate: serverTimestamp(), 
+                    itemId: item.id, 
+                    itemName: item.name, 
+                    quantity: item.quantity,
+                    amount: (item.amountPerUnit || 0) * item.quantity,
+                    memberId: selectedMember.id,
+                    memberName: selectedMember.name,
+                    user: mockUser.name,
+                    clubId: clubId
                 });
-
-            } else {
-                // --- Standard Item Logic ---
-                const itemDocRef = doc(db, 'clubs', clubId, 'inventoryItems', item.id);
-                batch.update(itemDocRef, { stockLevel: increment(-item.quantity) });
             }
+        });
 
-            // --- Universal Audit Log for each item ---
-            const logDocRef = doc(collection(db, 'clubs', clubId, 'transactions'));
-            batch.set(logDocRef, { 
-                type: 'dispense-log', 
-                transactionDate: serverTimestamp(), 
-                itemId: item.id, 
-                itemName: item.name, 
-                quantity: item.quantity,
-                amount: (item.amountPerUnit || 0) * item.quantity,
-                memberId: selectedMember.id,
-                memberName: selectedMember.name,
-                user: mockUser.name,
-                clubId: clubId
-            });
-        }
-
-        await batch.commit();
         setShowConfirmation(true);
 
     } catch (error: any) {
@@ -338,7 +334,7 @@ export default function POSPage() {
         toast({
             variant: "destructive",
             title: "Sale Failed",
-            description: "Could not complete the sale. Inventory has not been changed. Error: " + error.message,
+            description: "Could not complete the sale. Inventory may not have been changed. Error: " + error.message,
         });
     } finally {
         setIsConfirming(false);
@@ -647,3 +643,5 @@ export default function POSPage() {
     </>
   );
 }
+
+    

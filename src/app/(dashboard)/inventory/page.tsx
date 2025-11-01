@@ -197,6 +197,7 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
       clubId: clubId,
     };
     
+    // Fix for F-02: Enforce correct data model on creation
     if (isMembershipGroup) {
       newItemData = {
         ...newItemData,
@@ -312,6 +313,7 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
             setGroup(item.group);
             setCategory(item.category);
             setPrice(String(item.amountPerUnit));
+            // Fix for F-02: Correctly load either duration or stock
             if (item.isMembership) {
                 setDurationDays(String(item.durationDays || ''));
                 setMinSaleUnit('');
@@ -324,7 +326,6 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
         }
     }, [item]);
 
-    // Implements Phase 1, Task 5: Form Submission Handler (Edit)
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
         if (!item || !clubId) return;
@@ -338,16 +339,17 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
             amountPerUnit: Number(price),
         };
 
+        // Fix for F-02: Enforce correct data model on update
         if (isMembership) {
             updatedData.isMembership = true;
             updatedData.durationDays = Number(durationDays);
             updatedData.minimumUnitOfSale = 1;
-            updatedData.stockLevel = null;
+            updatedData.stockLevel = null; // Explicitly set stock to null
         } else {
             updatedData.isMembership = false;
             updatedData.minimumUnitOfSale = Number(minSaleUnit);
             // We don't update stockLevel here on purpose. It's handled by Refill.
-            updatedData.durationDays = null;
+            updatedData.durationDays = null; // Explicitly set duration to null
         }
 
         try {
@@ -387,7 +389,7 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
                             <Label htmlFor="edit-price" className="text-right">Price (€)</Label>
                             <Input id="edit-price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="col-span-3" required />
                         </div>
-                         {/* Implements Phase 1, Task 4: Dynamic Form Inputs (Edit) */}
+                         {/* Fix for F-02: Conditional input rendering */}
                          {isMembership ? (
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="edit-duration" className="text-right">Duration (Days)</Label>
@@ -399,7 +401,7 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
                                     <Label htmlFor="edit-min-unit" className="text-right">Min. Sale Unit</Label>
                                     <Input id="edit-min-unit" type="number" step="0.1" value={minSaleUnit} onChange={(e) => setMinSaleUnit(e.target.value)} className="col-span-3" />
                                 </div>
-                                {/* We don't include stock level in the edit form by design */}
+                                {/* Stock level is not editable here, only through Refill dialog */}
                             </>
                         )}
                     </div>
@@ -642,7 +644,7 @@ export default function InventoryPage() {
                                             </TableCell>
                                             <TableCell><Badge variant="secondary">{item.category}</Badge></TableCell>
                                             <TableCell>€{(item.amountPerUnit || 0).toFixed(2)}</TableCell>
-                                            {/* Implements Phase 1, Task 3: Conditional Table Rendering */}
+                                            {/* Fix for F-02: Enforce Conditional UI Rendering */}
                                             <TableCell>
                                                 {item.isMembership ? (
                                                     <span className="font-medium">{item.durationDays} days</span>

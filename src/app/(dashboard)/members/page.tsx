@@ -174,7 +174,8 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
       await uploadBytes(storageRef, data.idPhoto);
       const downloadURL = await getDownloadURL(storageRef);
   
-      // Implements Phase 2, Task 1: Update 'members' Schema on creation
+      // Fix for F-01: 'Add Member' Form
+      // Explicitly set `membershipExpiresAt` and `isVetoed` for new members.
       const newMemberData = {
         name: data.fullName,
         email: data.email,
