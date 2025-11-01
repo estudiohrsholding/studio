@@ -98,19 +98,18 @@ export default function POSPage() {
 
     const membersRef = collection(db, 'clubs', clubId, 'members');
     
-    let q = query(
-      membersRef,
-      orderBy('name'),
-      limit(10)
-    );
-
+    let q;
     if (memberSearchTerm) {
       q = query(
         membersRef,
         where('name', '>=', memberSearchTerm),
         where('name', '<=', memberSearchTerm + '\uf8ff'),
-        orderBy('name'),
-        limit(10)
+        orderBy('name')
+      );
+    } else {
+      q = query(
+        membersRef,
+        orderBy('name')
       );
     }
 
@@ -664,4 +663,3 @@ useEffect(() => {
     </>
   );
 }
-    
