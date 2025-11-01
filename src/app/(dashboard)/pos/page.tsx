@@ -140,6 +140,7 @@ export default function POSPage() {
     if (itemSearchTerm) {
       q = query(
         itemsRef,
+        orderBy('name'),
         where('name', '>=', itemSearchTerm),
         where('name', '<=', itemSearchTerm + '\uf8ff'),
         limit(10)
