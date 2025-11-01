@@ -271,7 +271,6 @@ useEffect(() => {
     const db = getFirestore();
     
     try {
-        // Fix for P-02: Re-architected transaction logic
         await runTransaction(db, async (transaction) => {
             // --- PHASE A: READS & VALIDATION ---
             const stockableItemsInCart = cart.filter(item => !item.isMembership);
@@ -314,8 +313,13 @@ useEffect(() => {
                 if (item.isMembership) {
                     // Update member's expiration date
                     const memberRef = doc(db, 'clubs', clubId, 'members', selectedMember.id);
-                    const durationToAdd = item.durationDays || 0;
                     
+                    // Fix for P-04: Harden the writer against bad data
+                    const durationToAdd = item.durationDays;
+                    if (!durationToAdd || durationToAdd <= 0) {
+                      throw new Error(`Item "${item.name}" is a membership but has an invalid duration.`);
+                    }
+
                     const now = new Date();
                     const newExpiryDate = new Date(now.getTime());
                     newExpiryDate.setDate(newExpiryDate.getDate() + durationToAdd);
