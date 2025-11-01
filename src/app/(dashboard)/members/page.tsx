@@ -72,7 +72,6 @@ interface Member {
     seconds: number;
     nanoseconds: number;
   } | null;
-  avatar: string;
   idPhotoUrl: string;
   membershipExpiresAt?: Timestamp | null;
   isVetoed?: boolean;
@@ -174,15 +173,12 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
       await uploadBytes(storageRef, data.idPhoto);
       const downloadURL = await getDownloadURL(storageRef);
   
-      // Fix for F-01: 'Add Member' Form
-      // Explicitly set `membershipExpiresAt` and `isVetoed` for new members.
       const newMemberData = {
         name: data.fullName,
         email: data.email,
         idPhotoUrl: downloadURL,
         clubId: clubId,
         createdAt: serverTimestamp(),
-        avatar: `https://picsum.photos/seed/${uuidv4()}/200/200`,
         isVetoed: false,
         membershipExpiresAt: null,
       };
@@ -557,7 +553,6 @@ export default function MembersPage() {
                         <TableRow key={i}>
                         <TableCell>
                             <div className="flex items-center gap-3">
-                            <Skeleton className="h-10 w-10 rounded-full" />
                             <div className="space-y-1">
                                 <Skeleton className="h-4 w-32" />
                                 <Skeleton className="h-3 w-40" />
@@ -621,14 +616,6 @@ export default function MembersPage() {
                         </TableCell>
                         <TableCell>
                             <div className="flex items-center gap-3">
-                            <Avatar>
-                                <AvatarImage
-                                src={member.avatar}
-                                alt={member.name}
-                                data-ai-hint="person portrait"
-                                />
-                                <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
                             <div>
                                 <div className="font-medium">{member.name}</div>
                                 <div className="text-sm text-muted-foreground">
@@ -638,7 +625,7 @@ export default function MembersPage() {
                             </div>
                         </TableCell>
                         <TableCell>
-                            <Badge variant="outline" className={status.color}>{status.text}</Badge>
+                            <Badge className={status.color}>{status.text}</Badge>
                         </TableCell>
                         <TableCell>
                             <Badge variant="outline">{member.id}</Badge>

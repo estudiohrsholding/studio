@@ -1,9 +1,8 @@
-
-// Implements Phase 2, Task 2: Create Derived State Function 'getMemberStatus'
+// src/lib/utils/statusUtils.ts
 import { Timestamp } from 'firebase/firestore';
 
 interface MemberStatus {
-    text: 'activated' | 'EXPIRED';
+    text: string; // Cambiado de 'activated' | 'EXPIRED' a string
     color: string;
 }
 
@@ -13,14 +12,18 @@ export function getMemberStatus(
     const now = new Date();
 
     if (!expiresAt) {
-        return { text: 'EXPIRED', color: 'text-gray-400' };
+        // Estado EXPIRED: fondo gris, texto blanco
+        return { text: 'EXPIRED', color: 'bg-gray-500 text-gray-50' };
     }
 
     const expirationDate = expiresAt.toDate();
 
     if (expirationDate > now) {
+        // Estado ACTIVATED: fondo verde, texto blanco
         return { text: 'activated', color: 'bg-green-700 text-green-50' };
     } else {
-        return { text: 'EXPIRED', color: 'text-gray-400' };
+        // Estado EXPIRED (fecha pasada): fondo gris, texto blanco
+        return { text: 'EXPIRED', color: 'bg-gray-500 text-gray-50' };
     }
 }
+ 

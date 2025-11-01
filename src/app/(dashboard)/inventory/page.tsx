@@ -563,7 +563,6 @@ export default function InventoryPage() {
                                         <TableRow key={itemIndex}>
                                             <TableCell>
                                             <div className="flex items-center gap-3">
-                                                <Skeleton className="h-10 w-10 rounded-md" />
                                                 <div className="space-y-1">
                                                     <Skeleton className="h-4 w-24" />
                                                     <Skeleton className="h-3 w-16" />
@@ -623,14 +622,6 @@ export default function InventoryPage() {
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-3">
-                                                    <Image
-                                                        src={item.imageUrl || `https://picsum.photos/seed/${item.id}/40/40`}
-                                                        alt={item.name}
-                                                        width={40}
-                                                        height={40}
-                                                        className="rounded-md object-cover"
-                                                        data-ai-hint={item.imageHint || 'product package'}
-                                                    />
                                                     <div>
                                                         <div className="font-medium">{item.name}</div>
                                                         <div className="text-sm text-muted-foreground">{item.group}</div>
@@ -719,5 +710,3 @@ export default function InventoryPage() {
     </>
   );
 }
-
-    
