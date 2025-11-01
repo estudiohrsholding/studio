@@ -1,3 +1,4 @@
+
 'use client';
 
 import { PlusCircle, Trash2 } from 'lucide-react';
@@ -16,7 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { PageWrapper } from '@/components/dashboard/page-wrapper';
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
-import type { Item } from '@/lib/types';
+import type { Item, Member } from '@/lib/types';
 import {
   Dialog,
   DialogContent,
@@ -37,7 +38,8 @@ import {
   doc,
   serverTimestamp,
   increment,
-  updateDoc,
+  runTransaction,
+  Timestamp,
 } from 'firebase/firestore';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -57,8 +59,6 @@ import { ChevronsUpDown } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { mockUser } from '@/lib/data';
-import { calculateNewExpiration } from '@/lib/utils/timeUtils';
-import type { Member } from '@/lib/types';
 
 interface CartItem extends Item {
   quantity: number;
@@ -86,7 +86,7 @@ export default function POSPage() {
   // --- Inventory Search State & Logic ---
   const [itemSearchTerm, setItemSearchTerm] = useState('');
   const [itemResults, setItemResults] = useState<Item[]>([]);
-  const [itemsLoading, setItemsLoading] = useState(true);
+  const [itemsLoading, setItemsLoading] useState(true);
   const [itemSelectOpen, setItemSelectOpen] = useState(false);
 
   const db = getFirestore();
@@ -211,7 +211,7 @@ export default function POSPage() {
 
     // Do not check stock for membership items
     if (!selectedItem.isMembership) {
-        const itemInStock = selectedItem.stockLevel;
+        const itemInStock = selectedItem.stockLevel || 0;
         if (numericQuantity > itemInStock) {
             setFormError(`Not enough stock. Only ${itemInStock} available.`);
             return; // Stop the item from being added
@@ -222,7 +222,7 @@ export default function POSPage() {
       const existingItem = prevCart.find((item) => item.id === selectedItem.id);
       if (existingItem) {
         if (!selectedItem.isMembership) {
-            const itemInStock = selectedItem.stockLevel;
+            const itemInStock = selectedItem.stockLevel || 0;
             const newTotalQuantity = existingItem.quantity + numericQuantity;
             if (newTotalQuantity > itemInStock) {
                 setFormError(`Not enough stock. You have ${existingItem.quantity} in cart, only ${itemInStock - existingItem.quantity} more available.`);
@@ -257,6 +257,7 @@ export default function POSPage() {
   }, [cart]);
 
 
+  // Implements Phase 2, Task 4: Membership Sale Transaction Logic
   const handleCompleteSale = async () => {
     if (!clubId || cart.length === 0 || !selectedMember) return;
     setIsConfirming(true);
@@ -283,19 +284,30 @@ export default function POSPage() {
         });
         
         for (const item of cart) {
-            if (item.isMembership && item.duration) {
-                // --- Membership Logic ---
-                console.log(`[FIX] Processing membership: ${item.name} for member ${selectedMember.id}`);
-                const memberDocRef = doc(db, 'clubs', clubId, 'members', selectedMember.id);
-                const newExpiration = calculateNewExpiration(item.duration);
-                console.log(`[FIX] New expiration calculated: ${newExpiration.toDate()}`);
-                
-                // 🔥 THE FIX: The missing update call is added here.
-                batch.update(memberDocRef, {
-                    membershipExpiresAt: newExpiration,
-                    isVetoed: false // Selling a membership un-vetoes a user
+            if (item.isMembership) {
+                const memberRef = doc(db, 'clubs', clubId, 'members', selectedMember.id);
+                const durationToAdd = item.durationDays || 0;
+
+                // Using a Firestore Transaction for the read-modify-write operation
+                await runTransaction(db, async (transaction) => {
+                    const memberDoc = await transaction.get(memberRef);
+                    if (!memberDoc.exists()) {
+                        throw "Member document not found!";
+                    }
+
+                    const currentExpiry = memberDoc.data().membershipExpiresAt?.toDate() || null;
+                    const now = new Date();
+                    
+                    // Stack new membership onto active ones, otherwise start from today
+                    const baseDate = (currentExpiry && currentExpiry > now) ? currentExpiry : now;
+                    
+                    const newExpiryDate = new Date(baseDate.getTime());
+                    newExpiryDate.setDate(newExpiryDate.getDate() + durationToAdd);
+
+                    transaction.update(memberRef, { 
+                        membershipExpiresAt: Timestamp.fromDate(newExpiryDate) 
+                    });
                 });
-                console.log(`[FIX] Queued update for member ${selectedMember.id} with new expiration.`);
 
             } else {
                 // --- Standard Item Logic ---
@@ -319,9 +331,7 @@ export default function POSPage() {
             });
         }
 
-        console.log('[FIX] Committing batch write...');
         await batch.commit();
-        console.log('[FIX] Batch commit successful.');
         setShowConfirmation(true);
 
     } catch (error: any) {
@@ -638,4 +648,5 @@ export default function POSPage() {
     </>
   );
 }
+
     

@@ -1,3 +1,4 @@
+
 import { Timestamp } from "firebase/firestore";
 
 export type User = {
@@ -11,6 +12,7 @@ export type User = {
   avatar: string;
 };
 
+// Implements Phase 2, Task 1: Update 'members' Schema
 export type Member = {
   id: string; // clientID
   clubId: string;
@@ -23,6 +25,7 @@ export type Member = {
   createdAt?: Timestamp;
 };
 
+// Implements Phase 1, Task 1: Update 'inventoryItems' Schema
 export type Item = {
   id: string;
   name:string;
@@ -30,11 +33,12 @@ export type Item = {
   category: string;
   minimumUnitOfSale: number;
   amountPerUnit: number;
-  stockLevel: number;
   imageUrl?: string;
   imageHint?: string;
+  // Polymorphic fields
   isMembership?: boolean;
-  duration?: string;
+  durationDays?: number | null;
+  stockLevel?: number | null;
 };
 
 export type Transaction = {

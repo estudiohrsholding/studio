@@ -61,7 +61,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { getMemberStatusTag } from '@/lib/utils/memberStatus';
+// Implements Phase 2, Task 3: Import status utility
+import { getMemberStatus } from '@/lib/utils/statusUtils';
 
 interface Member {
   id: string;
@@ -173,6 +174,7 @@ function AddMemberDialog({ onMemberAdded }: { onMemberAdded: () => void }) {
       await uploadBytes(storageRef, data.idPhoto);
       const downloadURL = await getDownloadURL(storageRef);
   
+      // Implements Phase 2, Task 1: Update 'members' Schema on creation
       const newMemberData = {
         name: data.fullName,
         email: data.email,
@@ -476,35 +478,26 @@ export default function MembersPage() {
   };
 
   const handleDeleteSelected = async () => {
-    console.log(`[DELETE] 1. handleDeleteSelected: Triggered for ${selectedMembers.size} members.`);
     if (!clubId || selectedMembers.size === 0) {
-        console.error('[DELETE] 2. FAILURE: clubId is null or no members selected.');
         return;
     }
 
     const db = getFirestore();
     const batch = writeBatch(db);
-    console.log('[DELETE] 3. WriteBatch created.');
 
     try {
         selectedMembers.forEach(memberId => {
             const memberDocRef = doc(db, 'clubs', clubId, 'members', memberId);
-            console.log(`[DELETE] 4. Queuing deletion for: ${memberDocRef.path}`);
             batch.delete(memberDocRef);
         });
 
-        console.log('[DELETE] 5. Attempting atomic batch.commit()...');
         await batch.commit();
-        console.log('%c[DELETE] 6. SUCCESS: batch.commit() completed.', 'color: #00FF00');
 
-        // Finalization on success
         setSelectedMembers(new Set());
         setIsSelectionMode(false);
-        console.log('[DELETE] 7. State cleared.');
 
     } catch (error: any) {
-        console.error('%c[DELETE] 8. CRITICAL FAILURE in try block:', 'color: #FF0000', error.message);
-        console.error(error);
+        console.error('Failed to delete members:', error.message);
     }
   };
 
@@ -612,7 +605,8 @@ export default function MembersPage() {
                     </TableHeader>
                     <TableBody>
                     {members.map((member) => {
-                      const status = getMemberStatusTag(member.membershipExpiresAt || null, member.isVetoed || false);
+                      // Implements Phase 2, Task 3: Display Real-Time Member Status
+                      const status = getMemberStatus(member.membershipExpiresAt);
                       return (
                         <TableRow key={member.id} data-state={selectedMembers.has(member.id) && "selected"}>
                         <TableCell>
@@ -643,7 +637,7 @@ export default function MembersPage() {
                             </div>
                         </TableCell>
                         <TableCell>
-                            <Badge variant="secondary" className={`${status.colorClass} text-white`}>{status.statusText}</Badge>
+                            <Badge variant="outline" className={status.color}>{status.text}</Badge>
                         </TableCell>
                         <TableCell>
                             <Badge variant="outline">{member.id}</Badge>
@@ -734,3 +728,5 @@ export default function MembersPage() {
     </>
   );
 }
+
+    

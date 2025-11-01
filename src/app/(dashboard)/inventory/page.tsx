@@ -115,7 +115,7 @@ function RefillDialog({ item }: { item: Item }) {
         }
     }}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={!!item.isMembership}>
+        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={item.isMembership}>
           <Plus className="h-4 w-4" />
           <span className="sr-only">Refill</span>
         </Button>
@@ -153,6 +153,7 @@ function RefillDialog({ item }: { item: Item }) {
   );
 }
 
+// Implements Phase 1, Task 4 & 5: Dynamic Form and Submission Logic
 function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
   const [name, setName] = useState('');
   const [group, setGroup] = useState('');
@@ -160,7 +161,7 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
   const [minSaleUnit, setMinSaleUnit] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
-  const [membershipTimeUnit, setMembershipTimeUnit] = useState('');
+  const [durationDays, setDurationDays] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { firestore } = useFirebase();
 
@@ -173,7 +174,7 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
     setMinSaleUnit('');
     setPrice('');
     setStock('');
-    setMembershipTimeUnit('');
+    setDurationDays('');
     setIsLoading(false);
   };
 
@@ -200,9 +201,9 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
       newItemData = {
         ...newItemData,
         isMembership: true,
-        duration: membershipTimeUnit,
-        minimumUnitOfSale: 1, // Memberships are sold as single units
-        stockLevel: undefined, // Explicitly ensure stockLevel is not written
+        durationDays: Number(durationDays),
+        minimumUnitOfSale: 1,
+        stockLevel: null,
       };
     } else {
       newItemData = {
@@ -210,7 +211,7 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
         isMembership: false,
         stockLevel: Number(stock),
         minimumUnitOfSale: Number(minSaleUnit) || 1,
-        duration: undefined, // Explicitly ensure duration is not written
+        durationDays: null,
       };
     }
 
@@ -266,8 +267,8 @@ function AddItemDialog({ onAddItem }: { onAddItem: () => void }) {
             </div>
             {isMembershipGroup ? (
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="duration" className="text-right">Duration</Label>
-                <Input id="duration" value={membershipTimeUnit} onChange={(e) => setMembershipTimeUnit(e.target.value)} placeholder="e.g., 30 days, 1 year" className="col-span-3" required />
+                <Label htmlFor="duration" className="text-right">Duration (Days)</Label>
+                <Input id="duration" type="number" value={durationDays} onChange={(e) => setDurationDays(e.target.value)} placeholder="e.g., 365" className="col-span-3" required />
               </div>
             ) : (
               <>
@@ -298,7 +299,7 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
     const [category, setCategory] = useState('');
     const [minSaleUnit, setMinSaleUnit] = useState('');
     const [price, setPrice] = useState('');
-    const [duration, setDuration] = useState('');
+    const [durationDays, setDurationDays] = useState('');
     const [stock, setStock] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const clubId = useAuthStore((state) => state.clubId);
@@ -312,17 +313,18 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
             setCategory(item.category);
             setPrice(String(item.amountPerUnit));
             if (item.isMembership) {
-                setDuration(item.duration || '');
+                setDurationDays(String(item.durationDays || ''));
                 setMinSaleUnit('');
                 setStock('');
             } else {
                 setMinSaleUnit(String(item.minimumUnitOfSale || ''));
                 setStock(String(item.stockLevel || ''));
-                setDuration('');
+                setDurationDays('');
             }
         }
     }, [item]);
 
+    // Implements Phase 1, Task 5: Form Submission Handler (Edit)
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
         if (!item || !clubId) return;
@@ -337,15 +339,15 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
         };
 
         if (isMembership) {
-            updatedData.duration = duration;
+            updatedData.isMembership = true;
+            updatedData.durationDays = Number(durationDays);
             updatedData.minimumUnitOfSale = 1;
-            updatedData.stockLevel = undefined; // Ensure stockLevel is removed
+            updatedData.stockLevel = null;
         } else {
+            updatedData.isMembership = false;
             updatedData.minimumUnitOfSale = Number(minSaleUnit);
             // We don't update stockLevel here on purpose. It's handled by Refill.
-            // But if you needed to edit it here, you'd add:
-            // updatedData.stockLevel = Number(stock);
-            updatedData.duration = undefined; // Ensure duration is removed
+            updatedData.durationDays = null;
         }
 
         try {
@@ -375,7 +377,7 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="edit-group" className="text-right">Group</Label>
-                            <Input id="edit-group" value={group} onChange={(e) => setGroup(e.target.value)} className="col-span-3" required />
+                            <Input id="edit-group" value={group} onChange={(e) => setGroup(e.target.value)} className="col-span-3" required readOnly />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="edit-category" className="text-right">Category</Label>
@@ -385,10 +387,11 @@ function EditItemDialog({ item, onUpdate, onOpenChange }: { item: Item | null, o
                             <Label htmlFor="edit-price" className="text-right">Price (€)</Label>
                             <Input id="edit-price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="col-span-3" required />
                         </div>
+                         {/* Implements Phase 1, Task 4: Dynamic Form Inputs (Edit) */}
                          {isMembership ? (
                             <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="edit-duration" className="text-right">Duration</Label>
-                                <Input id="edit-duration" value={duration} onChange={(e) => setDuration(e.target.value)} className="col-span-3" required />
+                                <Label htmlFor="edit-duration" className="text-right">Duration (Days)</Label>
+                                <Input id="edit-duration" type="number" value={durationDays} onChange={(e) => setDurationDays(e.target.value)} className="col-span-3" required />
                             </div>
                         ) : (
                             <>
@@ -487,35 +490,26 @@ export default function InventoryPage() {
     };
     
     const handleDeleteSelected = async () => {
-        console.log(`[DELETE] 1. handleDeleteSelected: Triggered for ${selectedItems.size} items.`);
         if (!clubId || selectedItems.size === 0) {
-            console.error('[DELETE] 2. FAILURE: clubId is null or no items selected.');
             return;
         }
     
         const db = getFirestore();
         const batch = writeBatch(db);
-        console.log('[DELETE] 3. WriteBatch created.');
     
         try {
             selectedItems.forEach(itemId => {
                 const itemDocRef = doc(db, 'clubs', clubId, 'inventoryItems', itemId);
-                console.log(`[DELETE] 4. Queuing deletion for: ${itemDocRef.path}`);
                 batch.delete(itemDocRef);
             });
     
-            console.log('[DELETE] 5. Attempting atomic batch.commit()...');
             await batch.commit();
-            console.log('%c[DELETE] 6. SUCCESS: batch.commit() completed.', 'color: #00FF00');
     
-            // Finalization on success
             setSelectedItems(new Set());
             setIsSelectionMode(false);
-            console.log('[DELETE] 7. State cleared.');
     
         } catch (error: any) {
-            console.error('%c[DELETE] 8. CRITICAL FAILURE in try block:', 'color: #FF0000', error.message);
-            console.error(error);
+            console.error('Failed to delete items:', error.message);
         }
     };
 
@@ -648,12 +642,13 @@ export default function InventoryPage() {
                                             </TableCell>
                                             <TableCell><Badge variant="secondary">{item.category}</Badge></TableCell>
                                             <TableCell>€{(item.amountPerUnit || 0).toFixed(2)}</TableCell>
+                                            {/* Implements Phase 1, Task 3: Conditional Table Rendering */}
                                             <TableCell>
                                                 {item.isMembership ? (
-                                                    <span className="font-medium">{item.duration}</span>
+                                                    <span className="font-medium">{item.durationDays} days</span>
                                                 ) : (
-                                                    <span className={item.stockLevel < 15 ? 'text-destructive font-medium' : ''}>
-                                                        {item.stockLevel}
+                                                    <span className={(item.stockLevel || 0) < 15 ? 'text-destructive font-medium' : ''}>
+                                                        {item.stockLevel} units
                                                     </span>
                                                 )}
                                             </TableCell>
