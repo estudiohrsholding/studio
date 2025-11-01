@@ -3,7 +3,7 @@
 import { Timestamp } from 'firebase/firestore';
 
 interface MemberStatus {
-    text: 'ACTIVE' | 'EXPIRED';
+    text: 'activated' | 'EXPIRED';
     color: string;
 }
 
@@ -19,10 +19,8 @@ export function getMemberStatus(
     const expirationDate = expiresAt.toDate();
 
     if (expirationDate > now) {
-        return { text: 'ACTIVE', color: 'text-green-500' };
+        return { text: 'activated', color: 'text-green-500' };
     } else {
         return { text: 'EXPIRED', color: 'text-gray-400' };
     }
 }
-
-    
