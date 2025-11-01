@@ -264,6 +264,7 @@ useEffect(() => {
   }, [cart]);
 
 
+  // Implements Phase 3: Transactional Logic Verification (HARDENED)
   const handleCompleteSale = async () => {
     if (!clubId || cart.length === 0 || !selectedMember) return;
     setIsConfirming(true);
@@ -276,9 +277,11 @@ useEffect(() => {
             const stockableItemsInCart = cart.filter(item => !item.isMembership);
             const itemRefs = stockableItemsInCart.map(item => doc(db, 'clubs', clubId, 'inventoryItems', item.id));
 
+            // 1. Leer todos los documentos de stock primero
             if (itemRefs.length > 0) {
                 const itemDocs = await Promise.all(itemRefs.map(ref => transaction.get(ref)));
     
+                // 2. Validar el stock
                 for (let i = 0; i < stockableItemsInCart.length; i++) {
                     const itemDoc = itemDocs[i];
                     const cartItem = stockableItemsInCart[i];
@@ -289,6 +292,8 @@ useEffect(() => {
             }
 
             // --- PHASE B: WRITES ---
+            // (Todo lo que sigue son solo escrituras)
+
             // Write 1: Main transaction log
             const transactionId = doc(collection(db, 'clubs', clubId, 'transactions')).id;
             const transactionDocRef = doc(db, 'clubs', clubId, 'transactions', transactionId);
@@ -311,22 +316,26 @@ useEffect(() => {
             // Write 2: Loop through cart again for individual updates
             for (const item of cart) {
                 if (item.isMembership) {
-                    // Update member's expiration date
-                    const memberRef = doc(db, 'clubs', clubId, 'members', selectedMember.id);
                     
-                    // Fix for P-04: Harden the writer against bad data
-                    const durationToAdd = item.durationDays;
+                    // --- INICIO DE LA LÓGICA ROBUSTA (EL FIX DE FASE 2) ---
+                    const durationToAdd = item.durationDays; 
+
+                    // Validación Crítica: Abortar si la membresía no tiene una duración válida
+                    // Esto previene el fallo silencioso (P-04)
                     if (!durationToAdd || durationToAdd <= 0) {
-                      throw new Error(`Item "${item.name}" is a membership but has an invalid duration.`);
+                        throw new Error(`Item ${item.name} is a membership but has an invalid duration (0 days or null). Transaction aborted.`);
                     }
 
+                    const memberRef = doc(db, 'clubs', clubId, 'members', selectedMember.id);
                     const now = new Date();
                     const newExpiryDate = new Date(now.getTime());
-                    newExpiryDate.setDate(newExpiryDate.getDate() + durationToAdd);
+                    newExpiryDate.setDate(now.getDate() + durationToAdd);
 
                     transaction.update(memberRef, { 
                         membershipExpiresAt: Timestamp.fromDate(newExpiryDate) 
                     });
+                    // --- FIN DE LA LÓGICA ROBUSTA ---
+
                 } else {
                     // Decrement stock for stockable items
                     const itemDocRef = doc(db, 'clubs', clubId, 'inventoryItems', item.id);
@@ -354,11 +363,12 @@ useEffect(() => {
         setShowConfirmation(true);
 
     } catch (error: any) {
-        console.error('Sale Failed:', error);
+        console.error('Sale Failed (Hardened Logic):', error);
         toast({
             variant: "destructive",
             title: "Sale Failed",
-            description: "Could not complete the sale. Inventory may have been changed. Error: " + error.message,
+            // Ahora, si la duración es 0, el usuario verá este error útil
+            description: error.message,
         });
     } finally {
         setIsConfirming(false);
