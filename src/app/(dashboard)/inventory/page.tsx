@@ -54,6 +54,7 @@ import type { Item } from '@/lib/types';
 import { mockUser } from '@/lib/data'; // Assuming mockUser might be needed for user name
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { getCategoryColorClass } from '@/lib/utils/inventoryUtils';
 
 
 function RefillDialog({ item }: { item: Item }) {
@@ -609,7 +610,9 @@ export default function InventoryPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {itemsInGroup.map((item) => (
+                                    {itemsInGroup.map((item) => {
+                                        const categoryColorClass = getCategoryColorClass(item.category);
+                                        return (
                                         <TableRow key={item.id} data-state={selectedItems.has(item.id) && "selected"}>
                                             <TableCell>
                                                 {isSelectionMode && (
@@ -622,13 +625,16 @@ export default function InventoryPage() {
                                             </TableCell>
                                             <TableCell>
                                                 <div className="flex items-center gap-3">
+                                                    <div className={`${categoryColorClass} h-3 w-3 rounded-full mr-2`}></div>
                                                     <div>
                                                         <div className="font-medium">{item.name}</div>
                                                         <div className="text-sm text-muted-foreground">{item.group}</div>
                                                     </div>
                                                 </div>
                                             </TableCell>
-                                            <TableCell><Badge variant="secondary">{item.category}</Badge></TableCell>
+                                            <TableCell>
+                                                <Badge className={`${categoryColorClass} text-white`}>{item.category}</Badge>
+                                            </TableCell>
                                             <TableCell>€{(item.amountPerUnit || 0).toFixed(2)}</TableCell>
                                             <TableCell>
                                                 {item.isMembership ? (
@@ -643,7 +649,7 @@ export default function InventoryPage() {
                                                 <RefillDialog item={item} />
                                             </TableCell>
                                         </TableRow>
-                                    ))}
+                                    )})}
                                 </TableBody>
                             </Table>
                         </div>
