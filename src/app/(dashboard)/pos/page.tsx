@@ -128,35 +128,41 @@ export default function POSPage() {
     return () => unsubscribe();
   }, [clubId, memberSearchTerm, db]);
 
-  // Effect for fetching inventory items
-  useEffect(() => {
-    if (!clubId) return;
-    setItemsLoading(true);
-    const itemsRef = collection(db, 'clubs', clubId, 'inventoryItems');
-    let q;
+// Effect for fetching inventory items
+useEffect(() => {
+  if (!clubId) return;
+  setItemsLoading(true);
+  const itemsRef = collection(db, 'clubs', clubId, 'inventoryItems');
+  let q;
 
-    if (itemSearchTerm) {
-      q = query(
-        itemsRef,
-        orderBy('name'),
-        where('name', '>=', itemSearchTerm),
-        where('name', '<=', itemSearchTerm + '\uf8ff'),
-        limit(10)
-      );
-    } else {
-      q = query(itemsRef, orderBy('name'), limit(10));
-    }
+  if (itemSearchTerm) {
+    // FIX: 'limit(10)' ELIMINADO de la búsqueda
+    q = query(
+      itemsRef,
+      orderBy('name'),
+      where('name', '>=', itemSearchTerm),
+      where('name', '<=', itemSearchTerm + '\uf8ff')
+      // limit(10) <-- ELIMINADO
+    );
+  } else {
+    // FIX: 'limit(10)' ELIMINADO de la lista por defecto
+    q = query(
+      itemsRef, 
+      orderBy('name')
+      // limit(10) <-- ELIMINADO
+    );
+  }
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedItems = snapshot.docs.map(
-        (doc) => ({ id: doc.id, ...doc.data() } as Item)
-      );
-      setItemResults(fetchedItems);
-      setItemsLoading(false);
-    });
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const fetchedItems = snapshot.docs.map(
+      (doc) => ({ id: doc.id, ...doc.data() } as Item)
+    );
+    setItemResults(fetchedItems);
+    setItemsLoading(false);
+  });
 
-    return () => unsubscribe();
-  }, [clubId, itemSearchTerm, db]);
+  return () => unsubscribe();
+}, [clubId, itemSearchTerm, db]);
 
   const isIntegerOnly = selectedItem ? Number.isInteger(selectedItem.minimumUnitOfSale) : false;
 
